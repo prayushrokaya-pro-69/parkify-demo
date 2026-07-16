@@ -886,9 +886,17 @@ def owner_document(request):
                 "Please select at least one document to upload."
             )
 
-        return redirect('owner_dashboard')
+        return redirect('owner_document')
 
-    return render(request, 'owner_document.html')
+    uploaded_doc_types = set(
+        OwnerDocument.objects.filter(owner=profile).values_list('document_type', flat=True)
+    )
+    verification_status = "Approved" if profile.is_verified else ("Pending" if uploaded_doc_types else "Not Started")
+
+    return render(request, 'owner_document.html', {
+        'uploaded_doc_types': uploaded_doc_types,
+        'verification_status': verification_status,
+    })
 def add_parking(request):
 
     if request.session.get('role') != 'owner':

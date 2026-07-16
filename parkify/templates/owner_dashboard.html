@@ -30,6 +30,7 @@
         <button onclick="showSection('parking-section')" class="nav-chip px-3 py-1.5 rounded-lg text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-white transition">Parking</button>
         <button onclick="showSection('booking-section')" class="nav-chip px-3 py-1.5 rounded-lg text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-white transition">Bookings</button>
         <button onclick="showSection('notification-section')" class="nav-chip px-3 py-1.5 rounded-lg text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-white transition">Notifications</button>
+        <button onclick="showSection('document-section')" class="nav-chip px-3 py-1.5 rounded-lg text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-white transition">Documents</button>
         <button onclick="showSection('profile-section')" class="nav-chip px-3 py-1.5 rounded-lg text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-white transition">Profile</button>
       </nav>
       <div class="flex items-center gap-2 sm:gap-3">
@@ -52,6 +53,7 @@
         <button onclick="showSection('parking-section')" class="text-left rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium">Parking</button>
         <button onclick="showSection('booking-section')" class="text-left rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium">Bookings</button>
         <button onclick="showSection('notification-section')" class="text-left rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium">Notifications</button>
+        <button onclick="showSection('document-section')" class="text-left rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium">Documents</button>
         <button onclick="showSection('profile-section')" class="text-left rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium">Profile</button>
         <a href="{% url 'logout' %}" class="text-left rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700">Logout</a>
       </div>
@@ -76,7 +78,13 @@
         <h1 class="text-3xl sm:text-4xl font-bold tracking-tight">Welcome, {{ owner.first_name }}</h1>
         <p class="mt-1 text-slate-500">Here's what's happening with your parking business.</p>
       </div>
+      {% if not document_exists %}
+      <button onclick="showSection('document-section')" class="inline-flex items-center gap-2 rounded-full bg-amber-50 text-amber-700 border border-amber-200 px-3.5 py-1.5 text-sm font-semibold w-fit hover:bg-amber-100 transition">
+        <i data-lucide="alert-circle" class="w-4 h-4"></i> {{ verification_status }} — Upload Documents
+      </button>
+      {% else %}
       <span class="inline-flex rounded-full bg-slate-100 text-slate-700 border border-slate-200 px-3.5 py-1.5 text-sm font-semibold w-fit">{{ verification_status }}</span>
+      {% endif %}
     </div>
 
     <div class="mt-6 grid sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-5">
