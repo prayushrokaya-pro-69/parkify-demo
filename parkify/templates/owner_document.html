@@ -1,0 +1,97 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Documents - Parkify</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+<style>
+  html { scroll-behavior: smooth; }
+  body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+</style>
+</head>
+<body class="bg-slate-50 text-slate-900">
+
+<header class="sticky top-0 z-40 bg-white/80 backdrop-blur border-b border-slate-200/70">
+  <div class="max-w-5xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <span class="text-lg font-extrabold tracking-tight">Parkify</span>
+      <span class="hidden sm:inline-flex items-center rounded-full bg-slate-900 text-white px-2.5 py-1 text-xs font-bold">Documents</span>
+    </div>
+    <nav class="hidden sm:flex items-center gap-1 bg-slate-100/80 rounded-xl p-1">
+      <a href="{% url 'owner_dashboard' %}" class="px-3 py-1.5 rounded-lg text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-white transition">Dashboard</a>
+      <a href="{% url 'owner_profile' %}" class="px-3 py-1.5 rounded-lg text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-white transition">Profile</a>
+      <a href="{% url 'logout' %}" class="px-3 py-1.5 rounded-lg text-sm font-medium text-red-600 hover:text-red-700">Logout</a>
+    </nav>
+    <div class="sm:hidden">
+      <a href="{% url 'owner_dashboard' %}" class="inline-flex items-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium">Dashboard</a>
+    </div>
+  </div>
+</header>
+
+<main class="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
+  {% if messages %}
+  <div class="space-y-2 mb-6">
+    {% for message in messages %}
+    <div class="rounded-xl border px-4 py-3 text-sm font-medium {% if message.tags == 'error' %}bg-red-50 text-red-700 border-red-200{% else %}bg-emerald-50 text-emerald-700 border-emerald-200{% endif %}">{{ message }}</div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="mb-8">
+    <h1 class="text-2xl sm:text-3xl font-bold">Verification Documents</h1>
+    <p class="mt-1 text-slate-500">Upload documents for admin verification.</p>
+  </div>
+
+  <form method="POST" enctype="multipart/form-data" class="space-y-5 sm:space-y-6">
+    {% csrf_token %}
+
+    <div class="rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 p-5 sm:p-8">
+      <div class="grid sm:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-slate-600 mb-1">Document Type</label>
+          <select name="document_type" required class="w-full rounded-xl border border-slate-200 px-4 py-2.5 outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition">
+            <option value="">Select Document</option>
+            <option>Citizenship</option>
+            <option>PAN Card</option>
+            <option>Driving License</option>
+            <option>Company Registration</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-600 mb-1">Document ID</label>
+          <input type="text" name="document_id" required class="w-full rounded-xl border border-slate-200 px-4 py-2.5 outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition">
+        </div>
+      </div>
+    </div>
+
+    <div class="rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 p-5 sm:p-8">
+      <div>
+        <label class="block text-sm font-medium text-slate-600 mb-1">Upload Document</label>
+        <input type="file" name="document_file" required class="w-full rounded-xl border border-slate-200 px-4 py-2.5">
+      </div>
+    </div>
+
+    <div class="rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 p-5 sm:p-8">
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <p class="text-sm font-semibold text-slate-700">Verification Status</p>
+          <p class="text-sm text-slate-500">Pending Approval</p>
+        </div>
+        <span class="inline-flex rounded-full bg-amber-50 text-amber-700 border border-amber-200 px-3.5 py-1.5 text-sm font-semibold">Pending Approval</span>
+      </div>
+    </div>
+
+    <div class="flex justify-end">
+      <button type="submit" class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-xl font-medium transition">Upload Document</button>
+    </div>
+  </form>
+</main>
+
+<script>
+lucide.createIcons();
+</script>
+</body>
+</html>

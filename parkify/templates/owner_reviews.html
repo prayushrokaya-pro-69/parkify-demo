@@ -1,0 +1,99 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reviews - {{ parking.parking_name }} | Parkify</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+<style>
+  html { scroll-behavior: smooth; }
+  body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+</style>
+</head>
+<body class="bg-slate-50 text-slate-900">
+
+<header class="sticky top-0 z-40 bg-white/80 backdrop-blur border-b border-slate-200/70">
+  <div class="max-w-5xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <span class="text-lg font-extrabold tracking-tight">Parkify</span>
+      <span class="hidden sm:inline-flex items-center rounded-full bg-slate-900 text-white px-2.5 py-1 text-xs font-bold">Reviews</span>
+    </div>
+    <nav class="hidden sm:flex items-center gap-1 bg-slate-100/80 rounded-xl p-1">
+      <a href="{% url 'owner_dashboard' %}" class="px-3 py-1.5 rounded-lg text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-white transition">Dashboard</a>
+      <a href="{% url 'parking_reviews' parking.id %}" class="px-3 py-1.5 rounded-lg text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-white transition">Parking</a>
+      <a href="{% url 'logout' %}" class="px-3 py-1.5 rounded-lg text-sm font-medium text-red-600 hover:text-red-700">Logout</a>
+    </nav>
+    <div class="sm:hidden">
+      <a href="{% url 'my_parking_lots' %}" class="inline-flex items-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium">Back</a>
+    </div>
+  </div>
+</header>
+
+<main class="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
+  {% if messages %}
+  <div class="mb-6 space-y-2">
+    {% for message in messages %}
+    <div class="px-4 py-3 rounded-xl {% if message.tags == 'error' %}bg-red-100 text-red-700{% else %}bg-emerald-100 text-emerald-700{% endif %}">{{ message }}</div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div>
+      <h1 class="text-2xl sm:text-3xl font-bold">{{ parking.parking_name }}</h1>
+      <p class="mt-1 text-slate-500">Customer reviews and ratings</p>
+    </div>
+    <div class="rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 px-5 py-4 text-center">
+      <p class="text-3xl font-bold text-amber-600">{{ average_rating }} <span class="text-lg">&#9733;</span></p>
+      <p class="text-sm text-slate-500">{{ review_count }} review{{ review_count|pluralize }}</p>
+    </div>
+  </div>
+
+  <div class="mt-6 space-y-4">
+    {% for review in reviews %}
+    <div class="rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 p-5 sm:p-6">
+      <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+        <div>
+          <p class="font-semibold text-sm">{{ review.user.first_name }} {{ review.user.last_name }}</p>
+          <p class="text-amber-500 text-sm">
+            {% for i in "12345" %}{% if forloop.counter <= review.rating %}&#9733;{% else %}<span class="text-slate-300">&#9733;</span>{% endif %}{% endfor %}
+          </p>
+        </div>
+        <span class="text-xs text-slate-400 sm:text-sm">{{ review.created_at|date:"M d, Y" }}</span>
+      </div>
+
+      {% if review.comment %}
+      <p class="mt-3 text-sm text-slate-700">{{ review.comment }}</p>
+      {% endif %}
+
+      {% if review.owner_reply %}
+      <div class="mt-4 rounded-xl bg-slate-50 p-4 flex items-start gap-2">
+        <i data-lucide="corner-down-right" class="w-4 h-4 text-slate-500 shrink-0"></i>
+        <div>
+          <p class="text-xs font-semibold text-slate-700">Your reply</p>
+          <p class="text-sm text-slate-600">{{ review.owner_reply }}</p>
+        </div>
+      </div>
+      {% else %}
+      <form method="POST" action="{% url 'owner_reply_review' review.id %}" class="mt-4 flex gap-2">
+        {% csrf_token %}
+        <input type="text" name="owner_reply" required placeholder="Write a public reply..." class="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition">
+        <button type="submit" class="rounded-xl bg-slate-900 text-white px-4 py-2.5 text-sm font-medium hover:bg-slate-800 transition">Reply</button>
+      </form>
+      {% endif %}
+    </div>
+    {% empty %}
+    <div class=" rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 p-10 text-center text-slate-500">
+      No reviews yet for this parking lot.
+    </div>
+    {% endfor %}
+  </div>
+</main>
+
+<script>
+lucide.createIcons();
+</script>
+</body>
+</html>

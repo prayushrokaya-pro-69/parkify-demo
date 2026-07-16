@@ -1,0 +1,183 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Payment | Parkify</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+<style>
+  html { scroll-behavior: smooth; }
+  body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+  .fade-up { animation: fadeUp .42s ease both; }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(6px);} to { opacity: 1; transform: translateY(0);} }
+</style>
+</head>
+<body class="bg-slate-50 text-slate-900">
+
+<header class="bg-white border-b border-slate-200">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 h-14 sm:h-16 flex items-center justify-between gap-3">
+    <div class="flex items-center gap-3">
+      <a href="{% url 'browse_parking' %}" class="inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900 transition">
+        <i data-lucide="arrow-left" class="w-4 h-4"></i> Back to browse
+      </a>
+      <span class="mx-2 h-4 w-px bg-slate-200 hidden sm:block"></span>
+      <span class="text-lg sm:text-xl font-extrabold tracking-tight">Parkify</span>
+    </div>
+    <a href="{% url 'my_bookings' %}" class="hidden sm:inline-flex text-sm font-medium text-slate-600 hover:text-slate-900 transition">My Bookings</a>
+  </div>
+</header>
+
+<main class="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+  <div class="grid lg:grid-cols-12 gap-6 lg:gap-8">
+
+    <div class="lg:col-span-5 space-y-4">
+      <div class="rounded-2xl bg-white ring-1 ring-slate-200 shadow-sm p-5 sm:p-6 lg:sticky lg:top-24">
+        <div class="flex items-center justify-between">
+          <h2 class="text-lg sm:text-xl font-bold">Booking Summary</h2>
+          <span class="inline-flex items-center gap-1 rounded-full bg-slate-100 text-slate-700 border border-slate-200 px-2.5 py-1 text-xs font-semibold">Simulated</span>
+        </div>
+        <div class="mt-5 divide-y divide-slate-100">
+          <div class="flex items-center justify-between py-3">
+            <span class="text-sm text-slate-500">Parking</span>
+            <span class="text-sm font-semibold text-right max-w-[200px] truncate">{{ booking.parking_name }}</span>
+          </div>
+          <div class="flex items-center justify-between py-3">
+            <span class="text-sm text-slate-500">Vehicle</span>
+            <span class="text-sm font-semibold">{{ booking.vehicle_number }} <span class="text-slate-400 font-medium">({{ booking.vehicle_type }})</span></span>
+          </div>
+          <div class="flex items-center justify-between py-3">
+            <span class="text-sm text-slate-500">Date</span>
+            <span class="text-sm font-semibold">{{ booking.booking_date }}</span>
+          </div>
+          <div class="flex items-center justify-between py-3">
+            <span class="text-sm text-slate-500">Duration</span>
+            <span class="text-sm font-semibold">{{ booking.duration }} hrs</span>
+          </div>
+        </div>
+        <div class="mt-5 rounded-xl bg-slate-50 border border-slate-200 p-4">
+          <div class="flex items-center justify-between">
+            <span class="text-sm font-semibold text-slate-600">Total Amount</span>
+            <span class="text-2xl font-bold text-slate-900">Rs {{ booking.amount }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="lg:col-span-7">
+      <div class="fade-up rounded-2xl bg-white ring-1 ring-slate-200 shadow-sm p-5 sm:p-6 lg:p-8">
+        <div class="flex items-center gap-3 mb-6">
+          <span class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
+            <i data-lucide="shield-check" class="w-5 h-5"></i>
+          </span>
+          <div>
+            <h2 class="text-xl font-bold">Secure payment</h2>
+            <p class="text-sm text-slate-500">Complete your booking with confidence.</p>
+          </div>
+        </div>
+
+        {% if messages %}
+        <div class="mb-6 space-y-2">
+          {% for message in messages %}
+          <div class="rounded-xl border px-4 py-3 text-sm font-medium
+            {% if message.tags == 'error' %}bg-red-50 text-red-700 border-red-200{% else %}bg-emerald-50 text-emerald-700 border-emerald-200{% endif %}">
+            {{ message }}
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        <div class="grid grid-cols-3 gap-3">
+          <button type="button" data-method="Card" class="method-tab rounded-2xl border-2 border-emerald-500 bg-emerald-50 p-4 text-center font-semibold transition">
+            <i data-lucide="credit-card" class="mx-auto mb-1"></i>
+            Card
+          </button>
+          <button type="button" data-method="Esewa" class="method-tab rounded-2xl border-2 border-slate-200 bg-white p-4 text-center font-medium transition hover:border-slate-300">
+            <i data-lucide="wallet" class="mx-auto mb-1"></i>
+            eSewa
+          </button>
+          <button type="button" data-method="Khalti" class="method-tab rounded-2xl border-2 border-slate-200 bg-white p-4 text-center font-medium transition hover:border-slate-300">
+            <i data-lucide="smartphone" class="mx-auto mb-1"></i>
+            Khalti
+          </button>
+        </div>
+
+        <form method="POST" action="{% url 'process_payment' booking.id %}" id="paymentForm" class="mt-6 space-y-4">
+          {% csrf_token %}
+          <input type="hidden" name="method" id="methodInput" value="Card">
+
+          <div id="cardFields" class="space-y-4">
+            <div>
+              <label class="block text-sm font-medium text-slate-600 mb-1">Card Number</label>
+              <div class="relative">
+                <input type="text" name="card_number" maxlength="19" placeholder="4242 4242 4242 4242" class="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition">
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-sm font-medium text-slate-600 mb-1">Expiry</label>
+                <input type="text" name="expiry" placeholder="MM/YY" class="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition">
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-slate-600 mb-1">CVV</label>
+                <input type="text" name="cvv" maxlength="4" placeholder="123" class="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition">
+              </div>
+            </div>
+          </div>
+
+          <div id="walletFields" class="space-y-4 hidden">
+            <div>
+              <label class="block text-sm font-medium text-slate-600 mb-1" id="walletLabel">Registered Mobile Number</label>
+              <input type="text" name="wallet_id" placeholder="98XXXXXXXX" class="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition">
+            </div>
+          </div>
+
+          <div class="rounded-xl bg-slate-50 border border-slate-200 p-4 flex items-start gap-3">
+            <i data-lucide="info" class="w-4 h-4 mt-0.5 text-slate-400"></i>
+            <p class="text-xs text-slate-500 leading-relaxed">This checkout is simulated for demo purposes. No real card is charged and no gateway connection is made.</p>
+          </div>
+
+          <button type="submit" class="w-full inline-flex items-center justify-center gap-2 bg-slate-900 hover:bg-emerald-700 transition text-white py-3.5 rounded-xl font-semibold">
+            Pay Rs {{ booking.amount }}
+          </button>
+        </form>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<script>
+lucide.createIcons();
+const tabs = document.querySelectorAll('.method-tab');
+const methodInput = document.getElementById('methodInput');
+const cardFields = document.getElementById('cardFields');
+const walletFields = document.getElementById('walletFields');
+const walletLabel = document.getElementById('walletLabel');
+
+tabs.forEach(tab => {
+  tab.addEventListener('click', () => {
+    tabs.forEach(t => {
+      t.classList.remove('border-emerald-500', 'bg-emerald-50');
+      t.classList.add('border-slate-200', 'bg-white');
+    });
+    tab.classList.add('border-emerald-500', 'bg-emerald-50');
+    tab.classList.remove('border-slate-200', 'bg-white');
+
+    const method = tab.dataset.method;
+    methodInput.value = method;
+
+    if (method === 'Card') {
+      cardFields.classList.remove('hidden');
+      walletFields.classList.add('hidden');
+    } else {
+      cardFields.classList.add('hidden');
+      walletFields.classList.remove('hidden');
+      walletLabel.textContent = method + ' Registered Mobile Number';
+    }
+  });
+});
+</script>
+</body>
+</html>

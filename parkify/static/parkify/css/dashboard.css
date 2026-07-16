@@ -1,0 +1,76 @@
+body{
+    background:#f5f7fb;
+    font-family:Arial;
+    overflow-x:hidden;
+    padding-top: 90px;
+}
+
+/* navbar */
+.custom-navbar{
+    backdrop-filter: blur(10px);
+    background: rgba(31, 36, 84, .75);
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    z-index: 1000;
+    padding: 15px 0;
+}
+
+.navbar-brand img{
+    width:55px;
+    height:55px;
+    border-radius:50%;
+}
+
+.logo-text span{
+    font-size:24px;
+    color:white;
+    font-weight:bold;
+}
+
+.logo-text small{
+    color:#f7c600;
+    font-size:12px;
+}
+/* mobile */
+@media(max-width:768px){
+
+    .navbar-brand img{
+        width:45px;
+        height:45px;
+    }
+
+    .logo-text span{
+        font-size:18px;
+    }
+
+    .menu-links{
+        text-align:center;
+        margin-top:20px;
+    }
+
+    .menu-links .nav-link{
+        padding:12px;
+    }
+
+    .contact-btn{
+        display:block;
+        width:100%;
+        text-align:center;
+        margin-top:15px;
+    }
+
+    .welcome-box{
+        padding:20px;
+    }
+
+    .card-box{
+        padding:20px;
+    }
+
+    .quick-btns button{
+        width:100%;
+        margin-bottom:10px;
+    }
+}

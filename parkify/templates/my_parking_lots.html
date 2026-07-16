@@ -1,0 +1,106 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Parking Lots | Parkify</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+<style>
+  html { scroll-behavior: smooth; }
+  body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+</style>
+</head>
+<body class="bg-slate-50 text-slate-900">
+
+<header class="sticky top-0 z-30 bg-white/80 backdrop-blur border-b border-slate-200/70">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 h-14 sm:h-16 flex items-center justify-between gap-3">
+    <div class="flex items-center gap-3">
+      <a href="{% url 'owner_dashboard' %}" class="text-lg sm:text-xl font-extrabold tracking-tight">Parkify</a>
+    </div>
+    <div class="flex items-center gap-2 sm:gap-3">
+      <a href="{% url 'add_parking' %}" class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl text-sm font-medium transition">+ Add Parking</a>
+      <a href="{% url 'owner_dashboard' %}" class="hidden sm:inline-flex text-sm font-medium text-slate-600 hover:text-slate-900 transition">Dashboard</a>
+    </div>
+  </div>
+</header>
+
+<main class="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
+  {% if messages %}
+  <div class="space-y-2 mb-6">
+    {% for message in messages %}
+    <div class="rounded-xl border px-4 py-3 text-sm font-medium {% if message.tags == 'error' %}bg-red-50 text-red-700 border-red-200{% else %}bg-emerald-50 text-emerald-700 border-emerald-200{% endif %}">{{ message }}</div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="mb-6">
+    <h1 class="text-2xl sm:text-3xl font-bold">My Parking Lots</h1>
+    <p class="mt-1 text-slate-500">Manage all your registered parking spaces.</p>
+  </div>
+
+  <div class="grid sm:grid-cols-2 xl:grid-cols-3 gap-5">
+    {% for parking in parkings %}
+    <div class="rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 overflow-hidden hover:shadow-xl transition">
+      <div class="relative">
+        {% if parking.parking_image %}
+        <img src="{{ parking.parking_image.url }}" alt="{{ parking.parking_name }}" class="w-full h-56 object-cover">
+        {% else %}
+        <div class="w-full h-56 bg-slate-100 flex items-center justify-center text-slate-300">
+          <i data-lucide="parking-circle" class="w-12 h-12"></i>
+        </div>
+        {% endif %}
+        <div class="absolute top-3 right-3">
+          {% if parking.is_active %}
+          <span class="inline-flex rounded-full bg-emerald-600 text-white px-2.5 py-1 text-xs font-semibold">Active</span>
+          {% else %}
+          <span class="inline-flex rounded-full bg-red-600 text-white px-2.5 py-1 text-xs font-semibold">Closed</span>
+          {% endif %}
+        </div>
+      </div>
+      <div class="p-5">
+        <h3 class="text-lg font-bold">{{ parking.parking_name }}</h3>
+        <p class="text-sm text-slate-500 mt-1">{{ parking.location }}</p>
+        <div class="mt-3">
+          {% if parking.rating_count > 0 %}
+          <span class="flex items-center gap-1 text-amber-600 text-sm font-medium">
+            <i data-lucide="star" class="w-4 h-4 fill-amber-400 text-amber-400"></i> {{ parking.avg_rating }}
+            <span class="text-slate-400 font-normal">({{ parking.rating_count }})</span>
+          </span>
+          {% else %}
+          <span class="text-sm text-slate-400">No reviews yet</span>
+          {% endif %}
+        </div>
+        <div class="grid grid-cols-2 gap-3 mt-4">
+          <div class="rounded-xl bg-slate-50 border border-slate-200 p-3 text-center">
+            <p class="text-xs text-slate-500">Cars</p>
+            <p class="text-xl font-bold">{{ parking.car_capacity }}</p>
+          </div>
+          <div class="rounded-xl bg-slate-50 border border-slate-200 p-3 text-center">
+            <p class="text-xs text-slate-500">Bikes</p>
+            <p class="text-xl font-bold">{{ parking.bike_capacity }}</p>
+          </div>
+        </div>
+        <p class="mt-4 text-2xl font-bold text-emerald-700">Rs {{ parking.rate_per_hour }}<span class="text-sm text-slate-500 font-medium">/hr</span></p>
+        <div class="grid grid-cols-2 gap-2 mt-4">
+          <a href="{% url 'view_parking' parking.id %}" class="inline-flex items-center justify-center rounded-xl bg-slate-900 text-white py-2.5 text-sm font-semibold hover:bg-slate-800 transition">View</a>
+          <a href="{% url 'parking_reviews' parking.id %}" class="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-medium hover:bg-slate-50 transition">Reviews</a>
+          <a href="{% url 'edit_parking' parking.id %}" class="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-medium hover:bg-slate-50 transition">Edit</a>
+          <a href="{% url 'delete_parking' parking.id %}" onclick="return confirm('Delete this parking lot?')" class="inline-flex items-center justify-center rounded-xl bg-red-600 text-white py-2.5 text-sm font-semibold hover:bg-red-700 transition">Delete</a>
+        </div>
+      </div>
+    </div>
+    {% empty %}
+    <div class="col-span-full">
+      <div class="rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 p-10 text-center text-slate-500">
+        No parking lots added yet.
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</main>
+
+<script>lucide.createIcons();</script>
+</body>
+</html>

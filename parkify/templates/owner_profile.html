@@ -1,0 +1,117 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Profile - Parkify</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+<style>
+  html { scroll-behavior: smooth; }
+  body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+</style>
+</head>
+<body class="bg-slate-50 text-slate-900">
+
+<header class="sticky top-0 z-40 bg-white/80 backdrop-blur border-b border-slate-200/70">
+  <div class="max-w-5xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <span class="text-lg font-extrabold tracking-tight">Parkify</span>
+      <span class="hidden sm:inline-flex items-center rounded-full bg-slate-900 text-white px-2.5 py-1 text-xs font-bold">Profile</span>
+    </div>
+    <nav class="hidden sm:flex items-center gap-1 bg-slate-100/80 rounded-xl p-1">
+      <a href="{% url 'owner_dashboard' %}" class="px-3 py-1.5 rounded-lg text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-white transition">Dashboard</a>
+      <a href="{% url 'owner_document' %}" class="px-3 py-1.5 rounded-lg text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-white transition">Documents</a>
+      <a href="{% url 'logout' %}" class="px-3 py-1.5 rounded-lg text-sm font-medium text-red-600 hover:text-red-700">Logout</a>
+    </nav>
+    <div class="sm:hidden">
+      <a href="{% url 'owner_dashboard' %}" class="inline-flex items-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium">Dashboard</a>
+    </div>
+  </div>
+</header>
+
+<main class="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
+  <div class="mb-8">
+    <h1 class="text-2xl sm:text-3xl font-bold">My Profile</h1>
+    <p class="mt-1 text-slate-500">Manage your account information.</p>
+  </div>
+
+  <form method="POST" enctype="multipart/form-data" class="space-y-5 sm:space-y-6">
+    {% csrf_token %}
+
+    {% if messages %}
+    <div class="space-y-2">
+      {% for message in messages %}
+      <div class="rounded-xl border px-4 py-3 text-sm font-medium {% if message.tags == 'error' %}bg-red-50 text-red-700 border-red-200{% else %}bg-emerald-50 text-emerald-700 border-emerald-200{% endif %}">{{ message }}</div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 p-5 sm:p-8">
+      <h2 class="text-xl font-bold mb-4">Profile Photo</h2>
+      <div class="flex items-center gap-4">
+        {% if owner.profile_image %}
+        <img src="{{ owner.profile_image.url }}" alt="Owner" class="h-16 w-16 rounded-full object-cover border-2 border-slate-200">
+        {% else %}
+        <div class="h-16 w-16 rounded-full bg-slate-200 flex items-center justify-center text-slate-500 font-bold">{{ owner.first_name|slice:"0:1" }}</div>
+        {% endif %}
+        <input type="file" name="profile_image" class="text-sm">
+      </div>
+    </div>
+
+    <div class="rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 p-5 sm:p-8">
+      <h2 class="text-xl font-bold mb-6">Personal Information</h2>
+      {% if not profile_exists %}
+      <p class="mb-4 text-sm text-slate-500">Complete your profile to start managing parking lots.</p>
+      {% endif %}
+      <div class="grid sm:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-slate-600 mb-1">Full Name</label>
+          <input type="text" name="full_name" value="{{ existing_profile.full_name|default:owner.first_name }}" class="w-full rounded-xl border border-slate-200 px-4 py-2.5 outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-600 mb-1">Username</label>
+          <input type="text" value="{{ owner.username }}" readonly class="w-full rounded-xl border border-slate-200 bg-slate-100 px-4 py-2.5 text-slate-500">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-600 mb-1">Email</label>
+          <input type="email" name="email" value="{{ owner.email }}" class="w-full rounded-xl border border-slate-200 px-4 py-2.5 outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-600 mb-1">Phone</label>
+          <input type="text" name="phone" value="{{ existing_profile.phone|default:'' }}" class="w-full rounded-xl border border-slate-200 px-4 py-2.5 outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition">
+        </div>
+      </div>
+    </div>
+
+    <div class="rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 p-5 sm:p-8">
+      <h2 class="text-xl font-bold mb-6">Business Information</h2>
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-slate-600 mb-1">Company Name</label>
+          <input type="text" name="company_name" value="{{ existing_profile.company_name|default:'' }}" class="w-full rounded-xl border border-slate-200 px-4 py-2.5 outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-600 mb-1">Registration Number</label>
+          <input type="text" name="registration_no" value="{{ existing_profile.registration_no|default:'' }}" class="w-full rounded-xl border border-slate-200 px-4 py-2.5 outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-600 mb-1">Business Address</label>
+          <textarea name="address" rows="4" class="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition">{{ existing_profile.address|default:'' }}</textarea>
+        </div>
+      </div>
+    </div>
+
+    <div class="flex flex-col sm:flex-row justify-end gap-3">
+      <a href="{% url 'owner_dashboard' %}" class="inline-flex items-center justify-center border border-slate-200 bg-white hover:bg-slate-50 px-5 py-3 rounded-xl font-medium transition">Cancel</a>
+      <button type="submit" class="inline-flex items-center justify-center bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-xl font-medium transition">Save Changes</button>
+    </div>
+  </form>
+</main>
+
+<script>
+lucide.createIcons();
+</script>
+</body>
+</html> 

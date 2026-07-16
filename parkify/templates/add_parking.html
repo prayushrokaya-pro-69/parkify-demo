@@ -1,0 +1,136 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Add Parking | Parkify</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  html { scroll-behavior: smooth; }
+  body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+  #locationMap { height: 320px; border-radius: 16px; }
+</style>
+</head>
+<body class="bg-slate-50 text-slate-900">
+
+<header class="sticky top-0 z-30 bg-white/90 backdrop-blur border-b border-slate-200">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-3">
+    <div class="flex items-center gap-3">
+      <a href="{% url 'my_parking_lots' %}" class="text-sm font-medium text-slate-600 hover:text-slate-900 transition">← My Parking Lots</a>
+      <span class="mx-2 h-4 w-px bg-slate-200"></span>
+      <a href="{% url 'owner_dashboard' %}" class="text-xl font-extrabold tracking-tight">Parkify</a>
+    </div>
+  </div>
+</header>
+
+<main class="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
+  <div class="mb-6">
+    <h1 class="text-2xl sm:text-3xl font-bold">Add Parking</h1>
+    <p class="mt-1 text-slate-500">Create a new parking listing with accurate details and location.</p>
+  </div>
+
+  <form method="POST" enctype="multipart/form-data" class="max-w-4xl space-y-6">
+    {% csrf_token %}
+
+    {% if messages %}
+    <div class="space-y-2">
+      {% for message in messages %}
+      <div class="rounded-xl border px-4 py-3 text-sm font-medium {% if message.tags == 'error' %}bg-red-50 text-red-700 border-red-200{% else %}bg-emerald-50 text-emerald-700 border-emerald-200{% endif %}">{{ message }}</div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 p-5 sm:p-8">
+      <h2 class="text-base font-semibold text-slate-700 mb-4">Basics</h2>
+      <div class="grid md:grid-cols-2 gap-4">
+        <div class="md:col-span-2">
+          <label class="block text-sm font-medium text-slate-600 mb-1">Parking Name</label>
+          <input type="text" name="parking_name" required placeholder="Central Mall Parking" value="{{ parking_name|default:'' }}" class="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition">
+        </div>
+        <div class="md:col-span-2">
+          <label class="block text-sm font-medium text-slate-600 mb-1">Location / Address</label>
+          <input type="text" name="location" required placeholder="Kathmandu, Thamel" value="{{ location|default:'' }}" class="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-600 mb-1">Covered / Uncovered</label>
+          <select name="map_link" class="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition">
+            <option value="Covered" {% if map_link|default:'' == 'Covered' %}selected{% endif %}>Covered</option>
+            <option value="Uncovered" {% if map_link|default:'' == 'Uncovered' %}selected{% endif %}>Uncovered</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-600 mb-1">Parking Image</label>
+          <input type="file" name="parking_image" accept="image/*" class="w-full rounded-xl border border-slate-200 px-4 py-3">
+        </div>
+      </div>
+    </div>
+
+    <div class="rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 p-5 sm:p-8">
+      <h2 class="text-base font-semibold text-slate-700 mb-4">Location & Map</h2>
+      <div class="grid md:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-slate-600 mb-1">Latitude</label>
+          <input type="text" id="lat" name="latitude" readonly class="w-full rounded-xl border border-slate-200 px-4 py-3 bg-slate-50">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-600 mb-1">Longitude</label>
+          <input type="text" id="lng" name="longitude" readonly class="w-full rounded-xl border border-slate-200 px-4 py-3 bg-slate-50">
+        </div>
+      </div>
+      <div class="mt-4">
+        <label class="block text-sm font-medium text-slate-600 mb-1">Select on Map</label>
+        <div id="locationMap"></div>
+        <p class="mt-2 text-xs text-slate-400">Click the map to pick the exact parking spot.</p>
+      </div>
+    </div>
+
+    <div class="rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 p-5 sm:p-8">
+      <h2 class="text-base font-semibold text-slate-700 mb-4">Capacity & Pricing</h2>
+      <div class="grid sm:grid-cols-3 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-slate-600 mb-1">Car Capacity</label>
+          <input type="number" name="car_capacity" min="0" placeholder="24" value="{{ car_capacity|default:'' }}" class="w-full rounded-xl border border-slate-200 px-4 py-3">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-600 mb-1">Bike Capacity</label>
+          <input type="number" name="bike_capacity" min="0" placeholder="40" value="{{ bike_capacity|default:'' }}" class="w-full rounded-xl border border-slate-200 px-4 py-3">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-600 mb-1">Rate Per Hour</label>
+          <input type="number" name="rate_per_hour" min="0" placeholder="120" value="{{ rate_per_hour|default:'' }}" class="w-full rounded-xl border border-slate-200 px-4 py-3">
+        </div>
+        <div class="sm:col-span-3">
+          <label class="block text-sm font-medium text-slate-600 mb-1">Description</label>
+          <textarea name="description" rows="3" placeholder="Short description for the listing..." class="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition">{{ description|default:'' }}</textarea>
+        </div>
+      </div>
+    </div>
+
+    <div class="flex items-center justify-end gap-3">
+      <a href="{% url 'my_parking_lots' %}" class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-3 font-medium hover:bg-slate-50 transition text-sm">Cancel</a>
+      <button type="submit" class="inline-flex items-center gap-2 rounded-xl bg-slate-900 text-white px-6 py-3 font-semibold hover:bg-emerald-600 transition text-sm">Save Parking</button>
+    </div>
+  </form>
+</main>
+
+<script>
+  const map = L.map('locationMap').setView([27.7172, 85.324], 13);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+  let marker = null;
+  function updateCoords(lat, lng) {
+    document.getElementById('lat').value = lat;
+    document.getElementById('lng').value = lng;
+  }
+  map.on('click', (e) => {
+    if (marker) map.removeLayer(marker);
+    marker = L.marker([e.latlng.lat, e.latlng.lng]).addTo(map);
+    updateCoords(e.latlng.lat.toFixed(5), e.latlng.lng.toFixed(5));
+  });
+</script>
+<script>lucide.createIcons();</script>
+</body>
+</html>

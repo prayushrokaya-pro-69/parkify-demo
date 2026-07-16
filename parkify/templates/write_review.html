@@ -1,0 +1,89 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Write Review | Parkify</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+<style>
+  html { scroll-behavior: smooth; }
+  body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+  .star-btn.active { fill: #f59e0b; stroke: #f59e0b; color: #f59e0b; }
+</style>
+</head>
+<body class="bg-slate-50 text-slate-900">
+
+<header class="sticky top-0 z-30 bg-white/90 backdrop-blur border-b border-slate-200">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-3">
+    <a href="{% url 'my_bookings' %}" class="text-sm font-medium text-slate-600 hover:text-slate-900 transition">← My Bookings</a>
+    <span class="text-xl font-extrabold tracking-tight">Parkify</span>
+  </div>
+</header>
+
+<main class="max-w-2xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
+  <div class="rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 p-6 sm:p-8">
+    {% if messages %}
+    <div class="mb-6 space-y-2">
+      {% for message in messages %}
+      <div class="px-4 py-3 rounded-xl {% if message.tags == 'error' %}bg-red-100 text-red-700{% else %}bg-emerald-100 text-emerald-700{% endif %}">{{ message }}</div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <h1 class="text-2xl font-bold">
+      {% if mode == 'edit' %}Edit Review{% else %}Write a Review{% endif %}
+    </h1>
+    <p class="mt-1 text-slate-500 text-sm">Share your experience at <strong>{{ parking.parking_name }}</strong>.</p>
+
+    <form method="POST" class="mt-6 space-y-5" id="reviewForm">
+      {% csrf_token %}
+      <div>
+        <label class="block text-sm font-medium text-slate-600 mb-1">Rating</label>
+        <div class="flex items-center gap-2">
+          {% for i in '12345' %}
+          <button type="button" data-value="{{ i }}" class="star-btn h-8 w-8 rounded-full border border-slate-200 bg-white hover:border-amber-300 transition flex items-center justify-center">
+            <i data-lucide="star" class="w-4 h-4 text-slate-300"></i>
+          </button>
+          {% endfor %}
+          <input type="hidden" name="rating" id="ratingInput" value="{{ review.rating|default:'' }}">
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-slate-600 mb-1">Comment</label>
+        <textarea name="comment" rows="4" placeholder="What stood out about your parking experience..." class="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition">{{ review.comment|default:'' }}</textarea>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <button type="submit" class="inline-flex items-center gap-2 bg-slate-900 text-white px-5 py-3 rounded-xl font-semibold hover:bg-emerald-700 transition">
+          {% if mode == 'edit' %}Update Review{% else %}Submit Review{% endif %}
+        </button>
+        <a href="{% url 'my_bookings' %}" class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-3 font-medium hover:bg-slate-50 transition text-sm">Cancel</a>
+      </div>
+    </form>
+  </div>
+</main>
+
+<script>
+  const existing = "{{ review.rating|default:'' }}";
+  document.querySelectorAll('.star-btn').forEach(btn => {
+    const value = parseInt(btn.dataset.value, 10);
+    const icon = btn.querySelector('[data-lucide]');
+    const setStar = (active) => {
+      btn.classList.toggle('active', active);
+      icon.classList.toggle('text-slate-300', !active);
+      icon.classList.toggle('text-amber-400', active);
+    };
+    btn.addEventListener('click', () => {
+      const input = document.getElementById('ratingInput');
+      input.value = value;
+      document.querySelectorAll('.star-btn').forEach(b => setStar(parseInt(b.dataset.value,10) <= value));
+    });
+    if (existing && value <= parseInt(existing, 10)) setStar(true);
+  });
+</script>
+<script>lucide.createIcons();</script>
+</body>
+</html>
