@@ -21,6 +21,11 @@
       <a href="{% url 'home' %}" class="text-lg sm:text-xl font-extrabold tracking-tight">Parkify</a>
     </div>
     <div class="flex items-center gap-2 sm:gap-3">
+      {% if request.session.role == 'owner' %}
+      <a href="{% url 'owner_dashboard' %}" class="hidden sm:inline-flex text-sm font-medium text-slate-600 hover:text-slate-900 transition">Dashboard</a>
+      {% else %}
+      <a href="{% url 'dashboard' %}" class="hidden sm:inline-flex text-sm font-medium text-slate-600 hover:text-slate-900 transition">Dashboard</a>
+      {% endif %}
       <a href="{% url 'browse_parking' %}" class="hidden sm:inline-flex text-sm font-medium text-slate-600 hover:text-slate-900 transition">Browse</a>
       <a href="{% url 'logout' %}" class="inline-flex items-center gap-1.5 text-sm font-medium text-red-600 hover:text-red-700 transition">Logout</a>
     </div>

@@ -25,7 +25,11 @@
       <a href="{% url 'browse_parking' %}" class="hidden sm:inline-flex items-center gap-2 border border-slate-200 bg-white px-3.5 py-2 rounded-xl text-sm font-medium hover:bg-slate-50 transition">
         <i data-lucide="search" class="w-4 h-4 text-slate-500"></i> Find Parking
       </a>
+      {% if request.session.role == 'owner' %}
+      <a href="{% url 'owner_dashboard' %}" class="hidden sm:inline-flex text-sm font-medium text-slate-600 hover:text-slate-900 transition">Dashboard</a>
+      {% else %}
       <a href="{% url 'dashboard' %}" class="hidden sm:inline-flex text-sm font-medium text-slate-600 hover:text-slate-900 transition">Dashboard</a>
+      {% endif %}
       <a href="{% url 'logout' %}" class="inline-flex items-center gap-1.5 text-sm font-medium text-red-600 hover:text-red-700 transition">Logout</a>
     </div>
   </div>

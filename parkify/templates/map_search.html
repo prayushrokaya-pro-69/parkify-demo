@@ -21,8 +21,18 @@
   <div class="max-w-7xl mx-auto w-full flex items-center justify-between">
     <a href="{% url 'browse_parking' %}" class="text-xl font-bold text-slate-900">Parkify</a>
     <div class="flex items-center gap-3">
-      <a href="{% url 'authentication' %}" class="text-sm font-medium text-slate-600 hover:text-slate-900 hidden sm:block">Login</a>
+      <a href="{% url 'browse_parking' %}" class="text-sm font-medium text-slate-600 hover:text-slate-900 hidden sm:block">Browse</a>
+      {% if request.session.user_id %}
+      {% if request.session.role == 'owner' %}
+      <a href="{% url 'owner_dashboard' %}" class="text-sm font-medium text-slate-600 hover:text-slate-900 hidden sm:block">Dashboard</a>
+      {% else %}
+      <a href="{% url 'dashboard' %}" class="text-sm font-medium text-slate-600 hover:text-slate-900 hidden sm:block">Dashboard</a>
+      {% endif %}
       <a href="{% url 'my_bookings' %}" class="text-sm font-medium text-slate-600 hover:text-slate-900 hidden sm:block">My Bookings</a>
+      <a href="{% url 'logout' %}" class="text-sm font-medium text-red-600 hover:text-red-700">Logout</a>
+      {% else %}
+      <a href="{% url 'authentication' %}" class="text-sm font-medium text-slate-600 hover:text-slate-900 hidden sm:block">Login</a>
+      {% endif %}
     </div>
   </div>
 </header>

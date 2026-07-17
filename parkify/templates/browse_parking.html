@@ -28,6 +28,12 @@
       <a href="{% url 'map_search' %}" class="hidden sm:inline-flex items-center gap-2 border border-slate-200 bg-white px-3.5 py-2 rounded-xl text-sm font-medium hover:bg-slate-50 transition">
         <i data-lucide="map" class="w-4 h-4 text-slate-500"></i> Map view
       </a>
+      {% if request.session.user_id %}
+      {% if request.session.role == 'owner' %}
+      <a href="{% url 'owner_dashboard' %}" class="hidden sm:inline-flex text-sm font-medium text-slate-600 hover:text-slate-900 transition">Dashboard</a>
+      {% else %}
+      <a href="{% url 'dashboard' %}" class="hidden sm:inline-flex text-sm font-medium text-slate-600 hover:text-slate-900 transition">Dashboard</a>
+      {% endif %}
       <a href="{% url 'my_bookings' %}" class="hidden sm:inline-flex text-sm font-medium text-slate-600 hover:text-slate-900 transition">Bookings</a>
       <a href="{% url 'saved_locations_list' %}" class="hidden sm:inline-flex items-center gap-1.5 text-sm font-medium text-slate-600 hover:text-slate-900 transition">
         <i data-lucide="heart" class="w-4 h-4"></i> Saved
@@ -39,6 +45,9 @@
         <span class="hidden md:block text-sm font-semibold leading-tight truncate max-w-[120px]">{{ request.session.username|default:"Guest" }}</span>
       </div>
       <a href="{% url 'logout' %}" class="inline-flex items-center gap-1.5 text-sm font-medium text-red-600 hover:text-red-700 transition">Logout</a>
+      {% else %}
+      <a href="{% url 'authentication' %}" class="inline-flex items-center gap-2 bg-slate-900 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-slate-800 transition">Login</a>
+      {% endif %}
     </div>
   </div>
 </header>

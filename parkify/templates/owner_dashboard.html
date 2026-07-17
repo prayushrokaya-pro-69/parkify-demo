@@ -30,19 +30,12 @@
         <button onclick="showSection('parking-section')" class="nav-chip px-3 py-1.5 rounded-lg text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-white transition">Parking</button>
         <button onclick="showSection('booking-section')" class="nav-chip px-3 py-1.5 rounded-lg text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-white transition">Bookings</button>
         <button onclick="showSection('notification-section')" class="nav-chip px-3 py-1.5 rounded-lg text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-white transition">Notifications</button>
-        <button onclick="showSection('document-section')" class="nav-chip px-3 py-1.5 rounded-lg text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-white transition">Documents</button>
-        <button onclick="showSection('profile-section')" class="nav-chip px-3 py-1.5 rounded-lg text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-white transition">Profile</button>
+        <a href="{% url 'owner_profile' %}" class="nav-chip px-3 py-1.5 rounded-lg text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-white transition">Profile</a>
+        <a href="{% url 'owner_document' %}" class="nav-chip px-3 py-1.5 rounded-lg text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-white transition">Documents</a>
       </nav>
       <div class="flex items-center gap-2 sm:gap-3">
         <button class="md:hidden bg-slate-100 p-2.5 rounded-full hover:bg-slate-200 transition" aria-label="Menu" onclick="document.getElementById('mobileMenu').classList.toggle('hidden')">
           <i data-lucide="menu" class="w-4 h-4 text-slate-700"></i>
-        </button>
-        <button onclick="showSection('profile-section')" class="hidden sm:flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-2 py-1 hover:bg-slate-50 transition" title="My Profile">
-          {% if owner.profile_image %}
-          <img src="{{ owner.profile_image.url }}" class="h-7 w-7 rounded-full object-cover">
-          {% else %}
-          <div class="h-7 w-7 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs font-bold">{{ owner.first_name|slice:"0:1" }}</div>
-          {% endif %}
         </button>
         <a href="{% url 'logout' %}" class="hidden sm:inline-flex items-center gap-1.5 text-sm font-medium text-red-600 hover:text-red-700 transition">Logout</a>
       </div>
@@ -53,8 +46,8 @@
         <button onclick="showSection('parking-section')" class="text-left rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium">Parking</button>
         <button onclick="showSection('booking-section')" class="text-left rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium">Bookings</button>
         <button onclick="showSection('notification-section')" class="text-left rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium">Notifications</button>
-        <button onclick="showSection('document-section')" class="text-left rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium">Documents</button>
-        <button onclick="showSection('profile-section')" class="text-left rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium">Profile</button>
+        <a href="{% url 'owner_profile' %}" class="text-left rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium">Profile</a>
+        <a href="{% url 'owner_document' %}" class="text-left rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium">Documents</a>
         <a href="{% url 'logout' %}" class="text-left rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700">Logout</a>
       </div>
     </div>
@@ -78,14 +71,35 @@
         <h1 class="text-3xl sm:text-4xl font-bold tracking-tight">Welcome, {{ owner.first_name }}</h1>
         <p class="mt-1 text-slate-500">Here's what's happening with your parking business.</p>
       </div>
-      {% if not document_exists %}
-      <button onclick="showSection('document-section')" class="inline-flex items-center gap-2 rounded-full bg-amber-50 text-amber-700 border border-amber-200 px-3.5 py-1.5 text-sm font-semibold w-fit hover:bg-amber-100 transition">
-        <i data-lucide="alert-circle" class="w-4 h-4"></i> {{ verification_status }} — Upload Documents
-      </button>
-      {% else %}
       <span class="inline-flex rounded-full bg-slate-100 text-slate-700 border border-slate-200 px-3.5 py-1.5 text-sm font-semibold w-fit">{{ verification_status }}</span>
-      {% endif %}
     </div>
+
+    {% if not profile_exists %}
+    <div class="mt-6 rounded-2xl bg-amber-50 border border-amber-200 p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div>
+        <h2 class="font-bold text-amber-900">Complete your profile to get started</h2>
+        <p class="mt-1 text-sm text-amber-800">Add your business details so you can upload verification documents and start listing parking lots.</p>
+      </div>
+      <a href="{% url 'owner_profile' %}" class="inline-flex items-center justify-center gap-2 bg-amber-600 hover:bg-amber-700 text-white px-5 py-2.5 rounded-xl text-sm font-semibold transition shrink-0">Complete Profile</a>
+    </div>
+    {% elif not document_exists %}
+    <div class="mt-6 rounded-2xl bg-amber-50 border border-amber-200 p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div>
+        <h2 class="font-bold text-amber-900">Upload your verification documents</h2>
+        <p class="mt-1 text-sm text-amber-800">Submit your citizenship, PAN, business registration and parking license so the admin can verify your account.</p>
+      </div>
+      <a href="{% url 'owner_document' %}" class="inline-flex items-center justify-center gap-2 bg-amber-600 hover:bg-amber-700 text-white px-5 py-2.5 rounded-xl text-sm font-semibold transition shrink-0">Upload Documents</a>
+    </div>
+    {% elif verification_status == 'Pending' %}
+    <div class="mt-6 rounded-2xl bg-blue-50 border border-blue-200 p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div>
+        <h2 class="font-bold text-blue-900">Documents submitted — pending admin review</h2>
+        <p class="mt-1 text-sm text-blue-800">You'll be able to add parking lots as soon as your account is approved. You can review or replace any document anytime.</p>
+      </div>
+      <a href="{% url 'owner_document' %}" class="inline-flex items-center justify-center gap-2 border border-blue-300 bg-white hover:bg-blue-100 text-blue-700 px-5 py-2.5 rounded-xl text-sm font-semibold transition shrink-0">View Documents</a>
+    </div>
+    {% endif %}
+
 
     <div class="mt-6 grid sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-5">
       <div class="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200 hover:shadow-lg transition">
@@ -106,7 +120,7 @@
       </div>
     </div>
 
-    <div class="mt-6 grid sm:grid-cols-3 gap-4 sm:gap-5">
+    <div class="mt-6 grid sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-5">
       <button onclick="showSection('add-parking-section')" class="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200 text-left hover:shadow-xl hover:-translate-y-1 transition">
         <div class="flex items-center gap-3">
           <div class="flex items-center justify-center h-10 w-10 rounded-xl bg-emerald-50 text-emerald-700"><i data-lucide="plus-circle" class="w-5 h-5"></i></div>
@@ -134,6 +148,15 @@
           </div>
         </div>
       </button>
+      <a href="{% url 'owner_document' %}" class="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200 text-left hover:shadow-xl hover:-translate-y-1 transition block">
+        <div class="flex items-center gap-3">
+          <div class="flex items-center justify-center h-10 w-10 rounded-xl bg-amber-50 text-amber-700"><i data-lucide="file-check-2" class="w-5 h-5"></i></div>
+          <div>
+            <p class="font-semibold">Documents</p>
+            <p class="text-sm text-slate-500">{{ verification_status }}</p>
+          </div>
+        </div>
+      </a>
     </div>
 
     <div class="mt-6 grid lg:grid-cols-2 gap-5">
@@ -200,13 +223,14 @@
             {% else %}
             <div class="w-32 h-32 rounded-full bg-slate-900 text-white flex items-center justify-center text-4xl font-bold">{{ owner.first_name|slice:":1" }}</div>
             {% endif %}
-            <label class="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-emerald-700 hover:text-emerald-800 cursor-pointer">
-              <i data-lucide="upload" class="w-4 h-4"></i> Change Photo
-              <input type="file" name="profile_image" accept="image/*" class="hidden" onchange="this.closest('form').querySelector('.file-name').textContent = this.files[0] ? this.files[0].name : ''">
-            </label>
-            <p class="file-name mt-1 text-xs text-slate-400"></p>
+            <input type="file" name="profile_image" class="mt-4 text-sm">
           </div>
           <div class="flex-1 w-full grid md:grid-cols-2 gap-4">
+            {% if profile_exists %}
+            <input type="hidden" name="full_name" value="{{ owner.ownerprofile.full_name }}">
+            <input type="hidden" name="company_name" value="{{ owner.ownerprofile.company_name }}">
+            <input type="hidden" name="registration_no" value="{{ owner.ownerprofile.registration_no }}">
+            {% endif %}
             <div>
               <label class="block text-sm font-medium text-slate-600 mb-1">First Name</label>
               <input type="text" name="first_name" value="{{ owner.first_name }}" class="w-full rounded-xl border border-slate-200 px-4 py-2.5 outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition">
