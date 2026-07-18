@@ -72,6 +72,13 @@ if EMAIL_HOST_USER and EMAIL_HOST_PASSWORD:
     EMAIL_PORT = int(os.environ.get('EMAIL_PORT', 587))
     EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'True') == 'True'
     EMAIL_USE_SSL = os.environ.get('EMAIL_USE_SSL', 'False') == 'True'
+    # Without this, a blocked/throttled outbound SMTP port (common on
+    # PaaS hosts) makes the connection attempt hang indefinitely, which
+    # blocks the whole request until gunicorn's own worker timeout kills
+    # the process outright - a crash that no try/except can catch, since
+    # nothing ever raises. A short timeout turns that hang into a normal
+    # socket.timeout exception well before gunicorn intervenes.
+    EMAIL_TIMEOUT = int(os.environ.get('EMAIL_TIMEOUT', 10))
 else:
     EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
