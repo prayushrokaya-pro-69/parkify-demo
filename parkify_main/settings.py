@@ -59,8 +59,23 @@ AUTHENTICATION_BACKENDS = [
     'allauth.account.auth_backends.AuthenticationBackend',
 ]
 
-# Email backend for password reset (console for dev/testing)
-EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+# Email delivery. Defaults to console (prints to logs, nothing actually
+# sent) so local development needs zero setup. Set EMAIL_HOST_USER and
+# EMAIL_HOST_PASSWORD (e.g. as Railway env vars) to switch to real SMTP
+# delivery for password-change notices, login OTPs, reactivation codes, etc.
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+
+if EMAIL_HOST_USER and EMAIL_HOST_PASSWORD:
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+    EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
+    EMAIL_PORT = int(os.environ.get('EMAIL_PORT', 587))
+    EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'True') == 'True'
+    EMAIL_USE_SSL = os.environ.get('EMAIL_USE_SSL', 'False') == 'True'
+else:
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER or 'no-reply@parkify.local')
 
 LOGIN_REDIRECT_URL = '/dashboard/'
 

@@ -2042,4 +2042,3 @@ def change_password(request):
     return render(request, 'change_password.html')
 
 # TODO(owner): expand SavedLocation endpoints after browse_parking map/bookmark UI is wired.
-# TODO(owner): add optional password-change email notification when backend mail is configured.
