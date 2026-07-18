@@ -9,31 +9,7 @@ from django.contrib.auth import update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.utils.encoding import force_bytes, force_str
-import logging
-from django.conf import settings as django_settings
-from django.core.mail import send_mail as _django_send_mail
-
-logger = logging.getLogger(__name__)
-
-
-def send_mail(*args, **kwargs):
-    """Drop-in wrapper around Django's send_mail that NEVER raises.
-
-    Django's own `fail_silently=True` only swallows OSError (network-level
-    failures) - it does NOT catch SMTP authentication errors, which are a
-    different exception type. A bad/missing app password would otherwise
-    crash the request with a 500 even though fail_silently=True was passed.
-    This wrapper catches everything and just logs it instead.
-    """
-    kwargs.setdefault('fail_silently', True)
-    try:
-        return _django_send_mail(*args, **kwargs)
-    except Exception:
-        logger.exception(
-            "Email send failed (backend=%s)",
-            getattr(django_settings, 'EMAIL_BACKEND', 'unknown')
-        )
-        return 0
+from django.core.mail import send_mail
 from django.utils import timezone
 from django.db.models import Count
 from django.db.models.functions import TruncDate
@@ -2066,3 +2042,4 @@ def change_password(request):
     return render(request, 'change_password.html')
 
 # TODO(owner): expand SavedLocation endpoints after browse_parking map/bookmark UI is wired.
+# TODO(owner): add optional password-change email notification when backend mail is configured.
