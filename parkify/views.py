@@ -11,7 +11,9 @@ from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.utils.encoding import force_bytes, force_str
 from django.core.mail import send_mail
 from django.utils import timezone
-from datetime import datetime, date
+from django.db.models import Count
+from django.db.models.functions import TruncDate
+from datetime import datetime, date, timedelta
 from math import ceil
 import random
 import string
@@ -454,6 +456,49 @@ def admin_dashboard(request):
 
     reviews = Review.objects.select_related('parking', 'user').all()
 
+    # --- Analytics widgets ---
+
+    # 30-day revenue trend (filled to zero on days with no successful payments,
+    # so the chart shows a continuous line rather than skipping gaps)
+    today = date.today()
+    range_start = today - timedelta(days=29)
+
+    revenue_by_day = (
+        PaymentTransaction.objects
+        .filter(status='Success', paid_at__date__gte=range_start)
+        .annotate(day=TruncDate('paid_at'))
+        .values('day')
+        .annotate(total=Sum('amount'))
+    )
+    revenue_map = {row['day']: float(row['total']) for row in revenue_by_day}
+
+    revenue_trend_labels = []
+    revenue_trend_data = []
+    for offset in range(30):
+        day = range_start + timedelta(days=offset)
+        revenue_trend_labels.append(day.strftime('%b %d'))
+        revenue_trend_data.append(revenue_map.get(day, 0))
+
+    # Booking status breakdown (all-time, across every booking)
+    status_order = ['Pending', 'Active', 'Completed', 'Cancelled']
+    status_counts = {
+        row['status']: row['count']
+        for row in Booking.objects.values('status').annotate(count=Count('id'))
+    }
+    booking_status_labels = status_order
+    booking_status_data = [status_counts.get(s, 0) for s in status_order]
+
+    # Top 5 parking lots by revenue
+    top_lots_qs = (
+        PaymentTransaction.objects
+        .filter(status='Success')
+        .values('booking__parking_name')
+        .annotate(total=Sum('amount'))
+        .order_by('-total')[:5]
+    )
+    top_lots_labels = [row['booking__parking_name'] for row in top_lots_qs]
+    top_lots_data = [float(row['total']) for row in top_lots_qs]
+
     context = {
         'admin': admin,
         'pending_owners': pending_owners,
@@ -464,6 +509,12 @@ def admin_dashboard(request):
         'total_revenue': total_revenue,
         'active_bookings_count': active_bookings_count,
         'reviews': reviews,
+        'revenue_trend_labels': revenue_trend_labels,
+        'revenue_trend_data': revenue_trend_data,
+        'booking_status_labels': booking_status_labels,
+        'booking_status_data': booking_status_data,
+        'top_lots_labels': top_lots_labels,
+        'top_lots_data': top_lots_data,
     }
 
     return render(request, 'admin_dashboard.html', context)
@@ -838,6 +889,37 @@ def owner_profile(request):
     })
 
 # Owner Document
+DOCUMENT_TYPE_MAPPING = {
+    'citizenship': 'Citizenship',
+    'pan_document': 'PAN Card',
+    'business_registration': 'Business Registration',
+    'parking_license': 'Parking License',
+}
+
+
+def _build_document_status(profile):
+    """Per-required-document status list, used by GET and error re-renders."""
+    existing_docs = {
+        doc.document_type: doc
+        for doc in OwnerDocument.objects.filter(owner=profile)
+    }
+
+    required_docs = []
+    for field_name, document_type in DOCUMENT_TYPE_MAPPING.items():
+        doc = existing_docs.get(document_type)
+        required_docs.append({
+            'field_name': field_name,
+            'label': document_type,
+            'status': doc.status if doc else 'Not Uploaded',
+            'uploaded': doc is not None,
+            'file_url': doc.file_url.url if doc else None,
+        })
+
+    all_uploaded = all(d['uploaded'] for d in required_docs)
+
+    return required_docs, all_uploaded
+
+
 def owner_document(request):
 
     if request.session.get('role') != 'owner':
@@ -848,54 +930,55 @@ def owner_document(request):
     try:
         profile = OwnerProfile.objects.get(owner=owner_user)
     except OwnerProfile.DoesNotExist:
-        messages.error(request,"Please complete your profile first.")
+        messages.error(request, "Please complete your profile first.")
         return redirect('owner_profile')
 
     if request.method == "POST":
 
-        document_mapping = {
-            'citizenship': 'Citizenship',
-            'pan_document': 'PAN Card',
-            'business_registration': 'Business Registration',
-            'parking_license': 'Parking License',
-        }
-
         uploaded_any = False
 
-        for field_name, document_type in document_mapping.items():
+        for field_name, document_type in DOCUMENT_TYPE_MAPPING.items():
 
             uploaded_file = request.FILES.get(field_name)
 
             if uploaded_file:
-                OwnerDocument.objects.create(
+                # update_or_create instead of create: re-uploading a document
+                # (e.g. after rejection) replaces the existing row instead of
+                # piling up duplicates for the same document type.
+                OwnerDocument.objects.update_or_create(
                     owner=profile,
-                    document_id=f"{document_type}-{profile.id}",
                     document_type=document_type,
-                    file_url=uploaded_file
+                    defaults={
+                        'document_id': f"{document_type}-{profile.id}",
+                        'file_url': uploaded_file,
+                        'status': 'Pending',
+                    }
                 )
                 uploaded_any = True
 
         if uploaded_any:
+            # New/updated documents mean any prior approval needs a fresh look.
+            if profile.is_verified:
+                profile.is_verified = False
+                profile.save()
+
             messages.success(
                 request,
-                "Documents uploaded successfully."
+                "Documents uploaded successfully. Your submission is now pending admin review."
             )
+            return redirect('owner_dashboard')
         else:
             messages.error(
                 request,
                 "Please select at least one document to upload."
             )
 
-        return redirect('owner_document')
-
-    uploaded_doc_types = set(
-        OwnerDocument.objects.filter(owner=profile).values_list('document_type', flat=True)
-    )
-    verification_status = "Approved" if profile.is_verified else ("Pending" if uploaded_doc_types else "Not Started")
+    required_docs, all_uploaded = _build_document_status(profile)
 
     return render(request, 'owner_document.html', {
-        'uploaded_doc_types': uploaded_doc_types,
-        'verification_status': verification_status,
+        'required_docs': required_docs,
+        'all_uploaded': all_uploaded,
+        'is_verified': profile.is_verified,
     })
 def add_parking(request):
 
