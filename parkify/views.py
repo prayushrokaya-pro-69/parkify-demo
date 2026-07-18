@@ -49,8 +49,11 @@ def _format_stat(n):
 
 
 # Landing Page
-def home(request):
-
+def _build_home_context(request):
+    """Shared context for index.html: featured lots, platform stats, testimonials.
+    Used by both the home page and the authentication modal (which renders
+    on top of index.html), so both always show a fully-populated page.
+    """
     today = date.today()
 
     featured_qs = ParkingLot.objects.filter(is_active=True).order_by('-created_at')[:3]
@@ -132,12 +135,16 @@ def home(request):
         .order_by('-rating', '-created_at')[:3]
     )
 
-    context = {
+    return {
         'featured_parkings': featured_parkings,
         'stats': stats,
         'testimonials': testimonials,
     }
 
+
+def home(request):
+    context = _build_home_context(request)
+    context['show_auth_modal'] = False
     return render(request, 'index.html', context)
 
 
@@ -249,7 +256,9 @@ def authentication(request):
             else:
                 return redirect('dashboard')
 
-    return render(request, 'authentication.html')
+    context = _build_home_context(request)
+    context['show_auth_modal'] = True
+    return render(request, 'index.html', context)
 
 
 def _send_login_otp(user):
