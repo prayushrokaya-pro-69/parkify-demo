@@ -11,9 +11,7 @@ from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.utils.encoding import force_bytes, force_str
 from django.core.mail import send_mail
 from django.utils import timezone
-from django.db.models import Count
-from django.db.models.functions import TruncDate
-from datetime import datetime, date, timedelta
+from datetime import datetime, date
 from math import ceil
 import random
 import string
@@ -48,12 +46,97 @@ def _format_stat(n):
     return f"{n}+"
 
 
-# Landing Page
-def _build_home_context(request):
-    """Shared context for index.html: featured lots, platform stats, testimonials.
-    Used by both the home page and the authentication modal (which renders
-    on top of index.html), so both always show a fully-populated page.
+def _role_dashboard_name(role):
+    """Return the URL name of the dashboard belonging to a given role."""
+    return {
+        'admin': 'admin_dashboard',
+        'owner': 'owner_dashboard',
+        'user': 'dashboard',
+    }.get(role, 'dashboard')
+
+
+def _login_redirect(request, message=None):
     """
+    Send an anonymous visitor to the login page while remembering the page
+    they were trying to reach, so they land back there - not on a generic
+    dashboard - once they've signed in.
+    """
+    if message:
+        messages.info(request, message)
+    next_url = request.get_full_path()
+    login_url = reverse('authentication')
+    return redirect(f"{login_url}?next={next_url}")
+
+
+def _wrong_role_redirect(request):
+    """
+    A logged-in user opened a page that belongs to a different role
+    (e.g. a user opening /owner-dashboard/). Instead of silently bouncing
+    them back to the login screen, send them to the dashboard that
+    actually belongs to their own account.
+    """
+    messages.info(request, "That page isn't available for your account. Here's your dashboard instead.")
+    return redirect(_role_dashboard_name(request.session.get('role')))
+
+
+def _get_safe_next(request, default_url_name):
+    """Resolve a safe `next` target from the request/session, guarding against open redirects."""
+    from django.utils.http import url_has_allowed_host_and_scheme
+
+    next_url = (
+        request.POST.get('next')
+        or request.GET.get('next')
+        or request.session.pop('login_next', None)
+    )
+    if next_url and url_has_allowed_host_and_scheme(
+        next_url, allowed_hosts={request.get_host()}, require_https=request.is_secure()
+    ):
+        return next_url
+    return reverse(default_url_name)
+
+
+def _platform_stats():
+    """
+    Real, database-backed platform stats - number of active parking lots,
+    number of registered users, average review rating, and currently-free
+    spots across every active lot today. Used on the homepage and reused
+    on the authentication modal so both show the same live numbers instead
+    of hardcoded placeholders.
+    """
+    today = date.today()
+
+    active_lots = ParkingLot.objects.filter(is_active=True)
+    total_lots = active_lots.count()
+    total_users = Signup.objects.filter(role='user').count()
+
+    rating_agg = Review.objects.aggregate(avg=models.Avg('rating'))['avg']
+    platform_rating = round(rating_agg, 1) if rating_agg else 5.0
+
+    # Sum of currently-free car+bike slots across every active lot, today.
+    total_available_spots = 0
+    for lot in active_lots:
+        car_booked = Booking.objects.filter(
+            parking_name=lot.parking_name, vehicle_type='Car',
+            booking_date=today, status__in=['Pending', 'Active']
+        ).count()
+        bike_booked = Booking.objects.filter(
+            parking_name=lot.parking_name, vehicle_type='Bike',
+            booking_date=today, status__in=['Pending', 'Active']
+        ).count()
+        total_available_spots += max(lot.car_capacity - car_booked, 0)
+        total_available_spots += max(lot.bike_capacity - bike_booked, 0)
+
+    return {
+        'total_lots_display': _format_stat(total_lots),
+        'total_users_display': _format_stat(total_users),
+        'platform_rating': platform_rating,
+        'total_available_spots': total_available_spots,
+    }
+
+
+# Landing Page
+def home(request):
+
     today = date.today()
 
     featured_qs = ParkingLot.objects.filter(is_active=True).order_by('-created_at')[:3]
@@ -99,33 +182,7 @@ def _build_home_context(request):
 
     # ---- Platform-wide stats (hero + stats-strip + floating badges) ----
 
-    active_lots = ParkingLot.objects.filter(is_active=True)
-    total_lots = active_lots.count()
-    total_users = Signup.objects.filter(role='user').count()
-
-    rating_agg = Review.objects.aggregate(avg=models.Avg('rating'))['avg']
-    platform_rating = round(rating_agg, 1) if rating_agg else 5.0
-
-    # Sum of currently-free car+bike slots across every active lot, today.
-    total_available_spots = 0
-    for lot in active_lots:
-        car_booked = Booking.objects.filter(
-            parking_name=lot.parking_name, vehicle_type='Car',
-            booking_date=today, status__in=['Pending', 'Active']
-        ).count()
-        bike_booked = Booking.objects.filter(
-            parking_name=lot.parking_name, vehicle_type='Bike',
-            booking_date=today, status__in=['Pending', 'Active']
-        ).count()
-        total_available_spots += max(lot.car_capacity - car_booked, 0)
-        total_available_spots += max(lot.bike_capacity - bike_booked, 0)
-
-    stats = {
-        'total_lots_display': _format_stat(total_lots),
-        'total_users_display': _format_stat(total_users),
-        'platform_rating': platform_rating,
-        'total_available_spots': total_available_spots,
-    }
+    stats = _platform_stats()
 
     # ---- Real testimonials, best-rated first ----
 
@@ -135,16 +192,12 @@ def _build_home_context(request):
         .order_by('-rating', '-created_at')[:3]
     )
 
-    return {
+    context = {
         'featured_parkings': featured_parkings,
         'stats': stats,
         'testimonials': testimonials,
     }
 
-
-def home(request):
-    context = _build_home_context(request)
-    context['show_auth_modal'] = False
     return render(request, 'index.html', context)
 
 
@@ -222,6 +275,13 @@ def authentication(request):
                 )
                 return redirect('authentication')
 
+            # Remember where the person was headed (e.g. a specific parking
+            # listing or "my bookings") so we can send them there once
+            # login - including a 2FA/reactivation detour - is complete.
+            requested_next = request.POST.get('next') or request.GET.get('next')
+            if requested_next:
+                request.session['login_next'] = requested_next
+
             if not user.is_active:
                 _send_reactivation_otp(user)
                 request.session['pending_reactivation_user_id'] = user.id
@@ -246,19 +306,14 @@ def authentication(request):
                 f"Welcome {user.username}!"
             )
 
-            # Redirect by role
-            if user.role == 'admin':
-                return redirect('admin_dashboard')
+            # Send them back to whatever page they were trying to reach;
+            # fall back to the dashboard that matches their role.
+            return redirect(_get_safe_next(request, _role_dashboard_name(user.role)))
 
-            elif user.role == 'owner':
-                return redirect('owner_dashboard')
-
-            else:
-                return redirect('dashboard')
-
-    context = _build_home_context(request)
-    context['show_auth_modal'] = True
-    return render(request, 'index.html', context)
+    return render(request, 'authentication.html', {
+        'next': request.GET.get('next', ''),
+        'stats': _platform_stats(),
+    })
 
 
 def _send_login_otp(user):
@@ -326,12 +381,7 @@ def verify_otp(request):
 
         messages.success(request, f"Welcome {user.username}!")
 
-        if user.role == 'admin':
-            return redirect('admin_dashboard')
-        elif user.role == 'owner':
-            return redirect('owner_dashboard')
-        else:
-            return redirect('dashboard')
+        return redirect(_get_safe_next(request, _role_dashboard_name(user.role)))
 
     return render(request, 'verify_otp.html', {'email': user.email})
 
@@ -423,22 +473,17 @@ def reactivate_account(request):
         if user.role == 'owner':
             messages.info(request, "Your parking listings were hidden when you deactivated your account. Re-enable them from 'My Parking Lots' whenever you're ready.")
 
-        if user.role == 'admin':
-            return redirect('admin_dashboard')
-        elif user.role == 'owner':
-            return redirect('owner_dashboard')
-        else:
-            return redirect('dashboard')
+        return redirect(_get_safe_next(request, _role_dashboard_name(user.role)))
 
     return render(request, 'reactivate_account.html', {'email': user.email})
 # Admin Dashboard
 def admin_dashboard(request):
 
     if not request.session.get('user_id'):
-        return redirect('authentication')
+        return _login_redirect(request)
 
     if request.session.get('role') != 'admin':
-        return redirect('authentication')
+        return _wrong_role_redirect(request)
 
     admin = Signup.objects.get(id=request.session['user_id'])
 
@@ -465,49 +510,6 @@ def admin_dashboard(request):
 
     reviews = Review.objects.select_related('parking', 'user').all()
 
-    # --- Analytics widgets ---
-
-    # 30-day revenue trend (filled to zero on days with no successful payments,
-    # so the chart shows a continuous line rather than skipping gaps)
-    today = date.today()
-    range_start = today - timedelta(days=29)
-
-    revenue_by_day = (
-        PaymentTransaction.objects
-        .filter(status='Success', paid_at__date__gte=range_start)
-        .annotate(day=TruncDate('paid_at'))
-        .values('day')
-        .annotate(total=Sum('amount'))
-    )
-    revenue_map = {row['day']: float(row['total']) for row in revenue_by_day}
-
-    revenue_trend_labels = []
-    revenue_trend_data = []
-    for offset in range(30):
-        day = range_start + timedelta(days=offset)
-        revenue_trend_labels.append(day.strftime('%b %d'))
-        revenue_trend_data.append(revenue_map.get(day, 0))
-
-    # Booking status breakdown (all-time, across every booking)
-    status_order = ['Pending', 'Active', 'Completed', 'Cancelled']
-    status_counts = {
-        row['status']: row['count']
-        for row in Booking.objects.values('status').annotate(count=Count('id'))
-    }
-    booking_status_labels = status_order
-    booking_status_data = [status_counts.get(s, 0) for s in status_order]
-
-    # Top 5 parking lots by revenue
-    top_lots_qs = (
-        PaymentTransaction.objects
-        .filter(status='Success')
-        .values('booking__parking_name')
-        .annotate(total=Sum('amount'))
-        .order_by('-total')[:5]
-    )
-    top_lots_labels = [row['booking__parking_name'] for row in top_lots_qs]
-    top_lots_data = [float(row['total']) for row in top_lots_qs]
-
     context = {
         'admin': admin,
         'pending_owners': pending_owners,
@@ -518,12 +520,6 @@ def admin_dashboard(request):
         'total_revenue': total_revenue,
         'active_bookings_count': active_bookings_count,
         'reviews': reviews,
-        'revenue_trend_labels': revenue_trend_labels,
-        'revenue_trend_data': revenue_trend_data,
-        'booking_status_labels': booking_status_labels,
-        'booking_status_data': booking_status_data,
-        'top_lots_labels': top_lots_labels,
-        'top_lots_data': top_lots_data,
     }
 
     return render(request, 'admin_dashboard.html', context)
@@ -585,10 +581,10 @@ def reject_owner(request, owner_id):
 def dashboard(request):
 
     if not request.session.get('user_id'):
-        return redirect('authentication')
+        return _login_redirect(request)
 
     if request.session.get('role') != 'user':
-        return redirect('authentication')
+        return _wrong_role_redirect(request)
 
     user = Signup.objects.get(id=request.session['user_id'])
     bookings_qs = Booking.objects.filter(user=user).order_by('-created_at')
@@ -615,10 +611,10 @@ def dashboard(request):
 def user_profile(request):
 
     if not request.session.get('user_id'):
-        return redirect('authentication')
+        return _login_redirect(request)
 
     if request.session.get('role') != 'user':
-        return redirect('authentication')
+        return _wrong_role_redirect(request)
 
     user = Signup.objects.get(id=request.session['user_id'])
 
@@ -661,7 +657,7 @@ def saved_locations_toggle(request, parking_id):
 def saved_locations_list(request):
 
     if not request.session.get('user_id'):
-        return redirect('authentication')
+        return _login_redirect(request)
 
     user = Signup.objects.get(id=request.session['user_id'])
     saved = SavedLocation.objects.filter(user=user).select_related('parking').order_by('-saved_at')
@@ -689,10 +685,10 @@ def saved_location_remove(request, saved_id):
 def owner_dashboard(request):
 
     if not request.session.get('user_id'):
-        return redirect('authentication')
+        return _login_redirect(request)
 
     if request.session.get('role') != 'owner':
-        return redirect('authentication')
+        return _wrong_role_redirect(request)
 
     owner = Signup.objects.get(
         id=request.session['user_id']
@@ -831,8 +827,11 @@ def owner_dashboard(request):
 # Owner profile
 def owner_profile(request):
 
+    if not request.session.get('user_id'):
+        return _login_redirect(request)
+
     if request.session.get('role') != 'owner':
-        return redirect('authentication')
+        return _wrong_role_redirect(request)
 
     owner_user = Signup.objects.get(
         id=request.session['user_id']
@@ -898,101 +897,75 @@ def owner_profile(request):
     })
 
 # Owner Document
-DOCUMENT_TYPE_MAPPING = {
-    'citizenship': 'Citizenship',
-    'pan_document': 'PAN Card',
-    'business_registration': 'Business Registration',
-    'parking_license': 'Parking License',
-}
-
-
-def _build_document_status(profile):
-    """Per-required-document status list, used by GET and error re-renders."""
-    existing_docs = {
-        doc.document_type: doc
-        for doc in OwnerDocument.objects.filter(owner=profile)
-    }
-
-    required_docs = []
-    for field_name, document_type in DOCUMENT_TYPE_MAPPING.items():
-        doc = existing_docs.get(document_type)
-        required_docs.append({
-            'field_name': field_name,
-            'label': document_type,
-            'status': doc.status if doc else 'Not Uploaded',
-            'uploaded': doc is not None,
-            'file_url': doc.file_url.url if doc else None,
-        })
-
-    all_uploaded = all(d['uploaded'] for d in required_docs)
-
-    return required_docs, all_uploaded
-
-
 def owner_document(request):
 
+    if not request.session.get('user_id'):
+        return _login_redirect(request)
+
     if request.session.get('role') != 'owner':
-        return redirect('authentication')
+        return _wrong_role_redirect(request)
 
     owner_user = Signup.objects.get(id=request.session['user_id'])
 
     try:
         profile = OwnerProfile.objects.get(owner=owner_user)
     except OwnerProfile.DoesNotExist:
-        messages.error(request, "Please complete your profile first.")
+        messages.error(request,"Please complete your profile first.")
         return redirect('owner_profile')
 
     if request.method == "POST":
 
+        document_mapping = {
+            'citizenship': 'Citizenship',
+            'pan_document': 'PAN Card',
+            'business_registration': 'Business Registration',
+            'parking_license': 'Parking License',
+        }
+
         uploaded_any = False
 
-        for field_name, document_type in DOCUMENT_TYPE_MAPPING.items():
+        for field_name, document_type in document_mapping.items():
 
             uploaded_file = request.FILES.get(field_name)
 
             if uploaded_file:
-                # update_or_create instead of create: re-uploading a document
-                # (e.g. after rejection) replaces the existing row instead of
-                # piling up duplicates for the same document type.
-                OwnerDocument.objects.update_or_create(
+                OwnerDocument.objects.create(
                     owner=profile,
+                    document_id=f"{document_type}-{profile.id}",
                     document_type=document_type,
-                    defaults={
-                        'document_id': f"{document_type}-{profile.id}",
-                        'file_url': uploaded_file,
-                        'status': 'Pending',
-                    }
+                    file_url=uploaded_file
                 )
                 uploaded_any = True
 
         if uploaded_any:
-            # New/updated documents mean any prior approval needs a fresh look.
-            if profile.is_verified:
-                profile.is_verified = False
-                profile.save()
-
             messages.success(
                 request,
-                "Documents uploaded successfully. Your submission is now pending admin review."
+                "Documents uploaded successfully."
             )
-            return redirect('owner_dashboard')
         else:
             messages.error(
                 request,
                 "Please select at least one document to upload."
             )
 
-    required_docs, all_uploaded = _build_document_status(profile)
+        return redirect('owner_document')
+
+    uploaded_doc_types = set(
+        OwnerDocument.objects.filter(owner=profile).values_list('document_type', flat=True)
+    )
+    verification_status = "Approved" if profile.is_verified else ("Pending" if uploaded_doc_types else "Not Started")
 
     return render(request, 'owner_document.html', {
-        'required_docs': required_docs,
-        'all_uploaded': all_uploaded,
-        'is_verified': profile.is_verified,
+        'uploaded_doc_types': uploaded_doc_types,
+        'verification_status': verification_status,
     })
 def add_parking(request):
 
+    if not request.session.get('user_id'):
+        return _login_redirect(request)
+
     if request.session.get('role') != 'owner':
-        return redirect('authentication')
+        return _wrong_role_redirect(request)
 
     owner_user = Signup.objects.get(
         id=request.session['user_id']
@@ -1093,8 +1066,11 @@ def add_parking(request):
 #my parking lot
 def my_parking_lots(request):
 
+    if not request.session.get('user_id'):
+        return _login_redirect(request)
+
     if request.session.get('role') != 'owner':
-        return redirect('authentication')
+        return _wrong_role_redirect(request)
 
     owner_user = Signup.objects.get(id=request.session['user_id'])
 
@@ -1110,8 +1086,11 @@ def my_parking_lots(request):
 #edit
 def edit_parking(request, parking_id):
 
+    if not request.session.get('user_id'):
+        return _login_redirect(request)
+
     if request.session.get('role') != 'owner':
-        return redirect('authentication')
+        return _wrong_role_redirect(request)
 
     owner_user = Signup.objects.get(id=request.session['user_id'])
     profile = OwnerProfile.objects.get(owner=owner_user)
@@ -1325,11 +1304,11 @@ def book_parking(request, parking_id):
 
     if not request.session.get('user_id'):
         messages.error(request, "Please login to book a parking spot.")
-        return redirect('authentication')
+        return redirect(f"{reverse('authentication')}?next={reverse('view_parking', args=[parking_id])}")
 
     if request.session.get('role') != 'user':
         messages.error(request, "Only users can book parking spots.")
-        return redirect('authentication')
+        return _wrong_role_redirect(request)
 
     parking = get_object_or_404(ParkingLot, id=parking_id, is_active=True)
 
@@ -1456,7 +1435,7 @@ def _generate_txn_id():
 def payment_page(request, booking_id):
 
     if not request.session.get('user_id'):
-        return redirect('authentication')
+        return _login_redirect(request)
 
     booking = get_object_or_404(
         Booking, id=booking_id, user_id=request.session['user_id']
@@ -1634,7 +1613,7 @@ def admin_delete_review(request, review_id):
 def my_bookings(request):
 
     if not request.session.get('user_id'):
-        return redirect('authentication')
+        return _login_redirect(request)
 
     bookings = Booking.objects.filter(
         user_id=request.session['user_id']
