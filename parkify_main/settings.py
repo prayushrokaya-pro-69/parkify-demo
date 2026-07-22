@@ -36,6 +36,13 @@ CSRF_TRUSTED_ORIGINS = [
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 SESSION_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_SECURE = not DEBUG
+
+# The authentication page embeds the homepage in an <iframe> (blurred, as a
+# backdrop behind the login/signup modal). Django blocks framing by default
+# (X-Frame-Options: DENY) - SAMEORIGIN allows this same-site embed while still
+# blocking any other site from framing us.
+X_FRAME_OPTIONS = 'SAMEORIGIN'
+
 # Application definition
 
 INSTALLED_APPS = [
@@ -58,6 +65,41 @@ AUTHENTICATION_BACKENDS = [
     'django.contrib.auth.backends.ModelBackend',
     'allauth.account.auth_backends.AuthenticationBackend',
 ]
+
+# ---------------------------------------------------------------------------
+# Google Sign-In (django-allauth)
+# ---------------------------------------------------------------------------
+# Parkify has its own `Signup` model + session-based login instead of
+# django.contrib.auth's User model, so allauth's normal "create a User"
+# behaviour is intercepted by parkify/adapters.py::ParkifySocialAccountAdapter,
+# which finds-or-creates the matching Signup row and logs the person in the
+# same way the username/password form does. See that file for details.
+SOCIALACCOUNT_ADAPTER = 'parkify.adapters.ParkifySocialAccountAdapter'
+
+# Lets the "Continue with Google" link be a plain <a href>, GET request
+# (instead of requiring a CSRF-protected POST form).
+SOCIALACCOUNT_LOGIN_ON_GET = True
+
+# Set these two as real environment variables in production. For local
+# development you can either export them before running the server, or
+# temporarily hardcode them here (never commit real secrets).
+#   GOOGLE_CLIENT_ID=xxxxxxxx.apps.googleusercontent.com
+#   GOOGLE_CLIENT_SECRET=xxxxxxxx
+# Get them from https://console.cloud.google.com/apis/credentials
+# Authorized redirect URI to whitelist there:
+#   http://127.0.0.1:8000/accounts/google/login/callback/   (local dev)
+#   https://<your-domain>/accounts/google/login/callback/   (production)
+SOCIALACCOUNT_PROVIDERS = {
+    'google': {
+        'APP': {
+            'client_id': os.environ.get('GOOGLE_CLIENT_ID', ''),
+            'secret': os.environ.get('GOOGLE_CLIENT_SECRET', ''),
+            'key': '',
+        },
+        'SCOPE': ['profile', 'email'],
+        'AUTH_PARAMS': {'access_type': 'online'},
+    }
+}
 
 # Email backend for password reset (console for dev/testing)
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
@@ -150,5 +192,3 @@ MEDIA_ROOT = BASE_DIR / "media"
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
