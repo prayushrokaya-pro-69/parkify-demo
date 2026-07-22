@@ -1,4 +1,3 @@
-{% load static %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -16,41 +15,38 @@
 </style>
 </head>
 <body class="bg-slate-100 text-slate-900">
-
 <header class="h-16 bg-white/90 backdrop-blur border-b border-slate-200 flex items-center px-4">
   <div class="max-w-7xl mx-auto w-full flex items-center justify-between">
-    <a href="{% url 'browse_parking' %}" class="text-xl font-bold text-slate-900">Parkify</a>
+    <a href="/browse-parking/" class="text-xl font-bold text-slate-900">Parkify</a>
     <div class="flex items-center gap-3">
-      <a href="{% url 'browse_parking' %}" class="text-sm font-medium text-slate-600 hover:text-slate-900 hidden sm:block">Browse</a>
-      {% if request.session.user_id %}
-      {% if request.session.role == 'owner' %}
-      <a href="{% url 'owner_dashboard' %}" class="text-sm font-medium text-slate-600 hover:text-slate-900 hidden sm:block">Dashboard</a>
-      {% else %}
-      <a href="{% url 'dashboard' %}" class="text-sm font-medium text-slate-600 hover:text-slate-900 hidden sm:block">Dashboard</a>
-      {% endif %}
-      <a href="{% url 'my_bookings' %}" class="text-sm font-medium text-slate-600 hover:text-slate-900 hidden sm:block">My Bookings</a>
-      <a href="{% url 'logout' %}" class="text-sm font-medium text-red-600 hover:text-red-700">Logout</a>
-      {% else %}
-      <a href="{% url 'authentication' %}" class="text-sm font-medium text-slate-600 hover:text-slate-900 hidden sm:block">Login</a>
-      {% endif %}
+      <a href="/browse-parking/" class="text-sm font-medium text-slate-600 hover:text-slate-900 hidden sm:block">Browse</a>
+
+      <a href="/authentication/" class="text-sm font-medium text-slate-600 hover:text-slate-900 hidden sm:block">Login</a>
+
     </div>
   </div>
 </header>
-
 <main class="max-w-7xl mx-auto">
-  {% if messages %}
-  <div class="space-y-2 mb-6">
-    {% for message in messages %}
-    <div class="rounded-xl border px-4 py-3 text-sm font-medium {% if message.tags == 'error' %}bg-red-50 text-red-700 border-red-200{% else %}bg-emerald-50 text-emerald-700 border-emerald-200{% endif %}">{{ message }}</div>
-    {% endfor %}
-  </div>
-  {% endif %}
 
   <div id="map" style="height: calc(100dvh - 64px);"></div>
 </main>
 
+<!--
+  IMPORTANT: this replaces the old "const sites = {{ sites }};" line.
+  {{ sites }} on its own renders Python's str()/repr() of the list
+  (single quotes, None, etc.) which is NOT valid JavaScript and crashes
+  the whole <script> block silently.
+
+  json_script safely serializes the Python list to real JSON and escapes
+  anything that could break out of the <script> tag. In your view, just
+  pass `sites` as a normal list of dicts in the context - no manual
+  json.dumps() needed, Django's filter handles it.
+-->
+{{ sites|json_script:"sites-data" }}
+
 <script>
-  const sites = {{ sites|safe }};
+  const sites = JSON.parse(document.getElementById('sites-data').textContent);
+
   if (!sites || !sites.length) {
     document.getElementById('map').insertAdjacentHTML('afterbegin', `<div class="flex h-full items-center justify-center text-slate-500">No parking spots found for map view.</div>`);
   } else {
@@ -59,7 +55,6 @@
       attribution: '&copy; OpenStreetMap contributors',
       maxZoom: 19
     }).addTo(map);
-
     const markers = [];
     sites.forEach((site) => {
       if (!site.lat || !site.lng) return;
@@ -68,14 +63,15 @@
       el.textContent = 'Rs ' + Math.round(site.rate_per_hour || 0) + '/hr';
       const icon = L.divIcon({ html: el.outerHTML, className: '', iconSize: [80, 28], iconAnchor: [40, 14] });
       const m = L.marker([site.lat, site.lng], { icon }).addTo(map);
-      const detailUrl = "{% url 'view_parking' 0 %}".replace('/0/', '/' + site.id + '/');
-m.bindPopup(`<strong>${site.name}</strong><br>${site.location}<br><a class='underline text-emerald-700' href='${detailUrl}'>View details</a>`);
+      const detailUrl = "/parking/0/".replace('/0/', '/' + site.id + '/');
+      m.bindPopup(`<strong>${site.name}</strong><br>${site.location}<br><a class='underline text-emerald-700' href='${detailUrl}'>View details</a>`);
       markers.push(m);
     });
-
     if (markers.length) {
       const group = new L.featureGroup(markers);
       map.fitBounds(group.getBounds().pad(0.15));
+    } else {
+      document.getElementById('map').insertAdjacentHTML('beforeend', `<div class="absolute top-4 left-4 bg-white px-3 py-2 rounded shadow text-sm text-slate-600">Some spots are missing coordinates and aren't shown on the map.</div>`);
     }
   }
 </script>
