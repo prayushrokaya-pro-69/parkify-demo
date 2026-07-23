@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 from pathlib import Path
 import os
+import dj_database_url
 from dotenv import load_dotenv
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -20,15 +21,34 @@ load_dotenv(BASE_DIR / '.env')
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-f7q*w$lazcrx=&$z2t=ual^iakzp8_3un-6t2hut)!%7=5!gnq'
+# Set SECRET_KEY as an environment variable in Railway. The hardcoded value
+# is kept only as a local-dev fallback so `runserver` still works without a
+# .env file.
+SECRET_KEY = os.environ.get(
+    'SECRET_KEY',
+    'django-insecure-f7q*w$lazcrx=&$z2t=ual^iakzp8_3un-6t2hut)!%7=5!gnq',
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+# Defaults to False (safe for Railway). Set DEBUG=True in your local .env
+# for development.
+DEBUG = os.environ.get('DEBUG', 'False').lower() == 'true'
 
+# Railway sets RAILWAY_PUBLIC_DOMAIN for the service's public domain.
+# ALLOWED_HOSTS can also be overridden with a comma-separated ALLOWED_HOSTS
+# env var if you attach a custom domain.
 ALLOWED_HOSTS = ['*']
+_env_allowed_hosts = os.environ.get('ALLOWED_HOSTS')
+if _env_allowed_hosts:
+    ALLOWED_HOSTS = [h.strip() for h in _env_allowed_hosts.split(',') if h.strip()]
+
 CSRF_TRUSTED_ORIGINS = [
     'https://*.up.railway.app',
 ]
+_railway_public_domain = os.environ.get('RAILWAY_PUBLIC_DOMAIN')
+if _railway_public_domain:
+    CSRF_TRUSTED_ORIGINS.append(f'https://{_railway_public_domain}')
+
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
@@ -136,15 +156,20 @@ WSGI_APPLICATION = 'parkify_main.wsgi.application'
 # Database
 
 
+
+# Railway injects a DATABASE_URL for whichever database plugin (Postgres or
+# MySQL) you attach to this service. dj_database_url parses it into Django's
+# DATABASES format. Locally, falls back to the same MySQL setup this project
+# used to hardcode - override any of it via a .env file if your local setup
+# differs.
+_local_default_db_url = 'mysql://root:Meroshare%401804@localhost:3306/parkify_db'
+
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'parkify_db',
-        'USER': 'root',
-        'PASSWORD': 'Meroshare@1804',
-        'HOST': 'localhost',
-        'PORT': '3306',
-    }
+    'default': dj_database_url.config(
+        default=os.environ.get('DATABASE_URL', _local_default_db_url),
+        conn_max_age=600,
+        ssl_require=os.environ.get('DATABASE_SSL_REQUIRE', 'False').lower() == 'true',
+    )
 }
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
@@ -182,6 +207,18 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+# WhiteNoise: serves static files directly from gunicorn with far-future
+# cache headers + compression, so no separate CDN/nginx is needed on Railway.
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
