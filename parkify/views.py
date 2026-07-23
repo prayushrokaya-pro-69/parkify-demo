@@ -11,7 +11,7 @@ from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.utils.encoding import force_bytes, force_str
 from django.core.mail import send_mail
 from django.utils import timezone
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from math import ceil
 import random
 import string
@@ -200,6 +200,30 @@ def home(request):
 
     return render(request, 'index.html', context)
 
+
+
+# Google Signup (choose a role before handing off to Google)
+def google_signup_start(request):
+    """
+    allauth's google_login link doesn't carry any custom params through the
+    Google round-trip - only `next` survives (see ParkifySocialAccountAdapter
+    for how that part works). To let people choose User vs Owner *before*
+    going to Google, we stash the choice in the session here (which persists
+    across the redirect to Google and back, unlike a GET param) and then
+    forward to the real google_login view. ParkifySocialAccountAdapter reads
+    and clears this session key, and only applies it to brand-new accounts -
+    an existing account's role is never changed this way.
+    """
+    role = request.GET.get('role', 'user')
+    if role not in ('user', 'owner'):
+        role = 'user'
+    request.session['pending_google_signup_role'] = role
+
+    next_url = request.GET.get('next', '')
+    google_login_url = reverse('google_login')
+    if next_url:
+        google_login_url += f'?next={next_url}'
+    return redirect(google_login_url)
 
 
 # Authentication Page
@@ -604,7 +628,6 @@ def dashboard(request):
         'saved_locations': saved_locations,
     })
 
-# TODO(owner): finish analytics widgets and saved-locations backend wiring; stop short of full CRM.
 
 
 # User profile - lets a regular user update their name, email and profile picture
@@ -765,6 +788,53 @@ def owner_dashboard(request):
 
     total_owner_revenue = revenue_qs.aggregate(total=models.Sum('amount'))['total'] or 0
 
+    avg_booking_value = round(total_owner_revenue / total_owner_bookings, 2) if total_owner_bookings else 0
+
+    status_counts = dict(
+        owner_bookings_qs.values('status').order_by().annotate(count=models.Count('id')).values_list('status', 'count')
+    )
+    status_breakdown = {
+        'Pending': status_counts.get('Pending', 0),
+        'Active': status_counts.get('Active', 0),
+        'Completed': status_counts.get('Completed', 0),
+        'Cancelled': status_counts.get('Cancelled', 0),
+    }
+
+    # ---- Compare against the immediately-preceding period of equal length ----
+    # Only meaningful when the owner has actually picked a specific window;
+    # with no filter (all-time) there's no equivalent "previous period".
+    revenue_change_pct = None
+    bookings_change_pct = None
+    if start_date and end_date:
+        try:
+            parsed_start = datetime.strptime(start_date, '%Y-%m-%d').date()
+            parsed_end = datetime.strptime(end_date, '%Y-%m-%d').date()
+            window_days = (parsed_end - parsed_start).days + 1
+            if window_days > 0:
+                prev_end = parsed_start - timedelta(days=1)
+                prev_start = prev_end - timedelta(days=window_days - 1)
+
+                prev_bookings_qs = Booking.objects.filter(
+                    parking_name__in=owner_parking_names,
+                    booking_date__gte=prev_start,
+                    booking_date__lte=prev_end,
+                )
+                prev_revenue_qs = PaymentTransaction.objects.filter(
+                    status='Success',
+                    booking__parking_name__in=owner_parking_names,
+                    paid_at__date__gte=prev_start,
+                    paid_at__date__lte=prev_end,
+                )
+                prev_bookings_count = prev_bookings_qs.count()
+                prev_revenue_total = prev_revenue_qs.aggregate(total=models.Sum('amount'))['total'] or 0
+
+                if prev_revenue_total:
+                    revenue_change_pct = round(((total_owner_revenue - prev_revenue_total) / prev_revenue_total) * 100)
+                if prev_bookings_count:
+                    bookings_change_pct = round(((total_owner_bookings - prev_bookings_count) / prev_bookings_count) * 100)
+        except ValueError:
+            pass
+
     recent_bookings_qs = owner_bookings_qs.select_related('user').order_by('-created_at')[:10]
     bookings = list(recent_bookings_qs)
 
@@ -798,7 +868,10 @@ def owner_dashboard(request):
             'parking': parking,
             'revenue': lot_amount,
             'bookings': lot_bookings.count(),
+            'share': round((lot_amount / total_owner_revenue) * 100) if total_owner_revenue else 0,
         })
+
+    revenue_per_lot.sort(key=lambda row: row['revenue'], reverse=True)
 
     context = {
         'owner': owner,
@@ -811,9 +884,14 @@ def owner_dashboard(request):
         'unread_notification_count': unread_notification_count,
         'total_owner_bookings': total_owner_bookings,
         'total_owner_revenue': total_owner_revenue,
+        'avg_booking_value': avg_booking_value,
+        'status_breakdown': status_breakdown,
+        'revenue_change_pct': revenue_change_pct,
+        'bookings_change_pct': bookings_change_pct,
         'bookings': bookings,
         'occupancy': occupancy,
         'revenue_per_lot': revenue_per_lot,
+        'max_lot_revenue': max([r['revenue'] for r in revenue_per_lot], default=0),
         'start_date': start_date,
         'end_date': end_date,
     }
@@ -823,7 +901,6 @@ def owner_dashboard(request):
         'owner_dashboard.html',
         context
     )
-# TODO(owner): add revenue-per-lot breakdown and booking date-window picker; stop before analytics suite.
 # Owner profile
 def owner_profile(request):
 
@@ -1054,7 +1131,7 @@ def add_parking(request):
         )
 
         return redirect(
-            'my_parking_lots'
+            reverse('owner_dashboard') + '?section=parking-section'
         )
 
     return render(
@@ -1152,7 +1229,7 @@ def edit_parking(request, parking_id):
 
         parking.save()
         messages.success(request, "Parking updated successfully.")
-        return redirect('my_parking_lots')
+        return redirect(reverse('owner_dashboard') + '?section=parking-section')
 
     return render(request, 'edit_parking.html', {'parking': parking})
 
@@ -1194,12 +1271,22 @@ def view_parking(request, parking_id):
     average_rating = parking.average_rating()
     review_count = parking.review_count()
 
+    # If the person viewing this is the owner of THIS listing, they're
+    # previewing their own public page - not a customer about to book it.
+    is_listing_owner = False
+    if request.session.get('role') == 'owner' and request.session.get('user_id'):
+        is_listing_owner = OwnerProfile.objects.filter(
+            owner_id=request.session['user_id'],
+            id=parking.owner_id,
+        ).exists()
+
     context = {
         'parking': parking,
         'today': today,
         'car_available': max(parking.car_capacity - car_booked, 0),
         'bike_available': max(parking.bike_capacity - bike_booked, 0),
         'logged_in': bool(request.session.get('user_id')),
+        'is_listing_owner': is_listing_owner,
         'reviews': reviews,
         'average_rating': average_rating,
         'review_count': review_count,
@@ -1282,7 +1369,6 @@ def browse_parking(request):
     return render(request, 'browse_parking.html', context)
 
 
-# TODO(owner): make dashboard compute owner revenue/occupancy from a single date-windowed aggregation so stats stay consistent with bookings.
 def map_search(request):
     parkings = list(ParkingLot.objects.filter(is_active=True)[:200])
     sites = [
@@ -2019,6 +2105,3 @@ def change_password(request):
         return redirect(dashboard_name)
 
     return render(request, 'change_password.html')
-
-# TODO(owner): expand SavedLocation endpoints after browse_parking map/bookmark UI is wired.
-# TODO(owner): add optional password-change email notification when backend mail is configured.

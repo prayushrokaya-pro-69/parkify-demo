@@ -12,37 +12,32 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 from pathlib import Path
 import os
-import dj_database_url
+from dotenv import load_dotenv
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-
-
+load_dotenv(BASE_DIR / '.env')
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get(
-    'SECRET_KEY',
-    'django-insecure-f7q*w$lazcrx=&$z2t=ual^iakzp8_3un-6t2hut)!%7=5!gnq'
-)
+SECRET_KEY = 'django-insecure-f7q*w$lazcrx=&$z2t=ual^iakzp8_3un-6t2hut)!%7=5!gnq'
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*').split(',')
+ALLOWED_HOSTS = ['*']
 CSRF_TRUSTED_ORIGINS = [
     'https://*.up.railway.app',
 ]
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-SESSION_COOKIE_SECURE = not DEBUG
-CSRF_COOKIE_SECURE = not DEBUG
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
 
 # The authentication page embeds the homepage in an <iframe> (blurred, as a
 # backdrop behind the login/signup modal). Django blocks framing by default
 # (X-Frame-Options: DENY) - SAMEORIGIN allows this same-site embed while still
 # blocking any other site from framing us.
 X_FRAME_OPTIONS = 'SAMEORIGIN'
-
 # Application definition
 
 INSTALLED_APPS = [
@@ -142,10 +137,14 @@ WSGI_APPLICATION = 'parkify_main.wsgi.application'
 
 
 DATABASES = {
-    'default': dj_database_url.config(
-        default='mysql://root:Meroshare%401804@localhost:3306/parkify_db',
-        conn_max_age=600,
-    )
+    'default': {
+        'ENGINE': 'django.db.backends.mysql',
+        'NAME': 'parkify_db',
+        'USER': 'root',
+        'PASSWORD': 'Meroshare@1804',
+        'HOST': 'localhost',
+        'PORT': '3306',
+    }
 }
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
@@ -181,14 +180,11 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
-STATIC_URL = "/static/"
-STATIC_ROOT = BASE_DIR / "staticfiles"
-
-STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
-
-MEDIA_URL = "/media/"
-MEDIA_ROOT = BASE_DIR / "media"
+STATIC_URL = 'static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'

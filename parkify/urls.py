@@ -4,6 +4,7 @@ from . import views
 urlpatterns = [
     path('', views.home, name='home'),
     path('authentication/', views.authentication, name='authentication'),
+    path('accounts/google/signup/', views.google_signup_start, name='google_signup_start'),
     path('admin-dashboard/',views.admin_dashboard,name='admin_dashboard'),
     path('dashboard/', views.dashboard, name='dashboard'),
     path('owner-dashboard/', views.owner_dashboard, name='owner_dashboard'),

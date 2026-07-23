@@ -48,7 +48,7 @@
 <!-- Sidebar -->
 <aside id="sidebar" class="fixed inset-y-0 left-0 z-40 w-64 bg-white border-r border-slate-200 flex flex-col -translate-x-full lg:translate-x-0">
   <div class="h-16 flex items-center gap-2.5 px-5 border-b border-slate-200 shrink-0">
-    <a href="{% url 'home' %}" class="flex items-center gap-2.5 min-w-0">
+    <a href="{% url 'admin_dashboard' %}" onclick="showSection('dashboard-section'); return false;" class="flex items-center gap-2.5 min-w-0">
       <div class="h-8 w-8 rounded-lg bg-white ring-1 ring-slate-200 flex items-center justify-center shrink-0">
         <img src="{% static 'parkify/images/image.png' %}" alt="Parkify" class="w-5 h-5 object-contain">
       </div>

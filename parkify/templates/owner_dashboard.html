@@ -50,7 +50,7 @@
 <!-- Sidebar -->
 <aside id="sidebar" class="fixed inset-y-0 left-0 z-40 w-64 bg-white border-r border-slate-200 flex flex-col -translate-x-full lg:translate-x-0">
   <div class="h-16 flex items-center gap-2.5 px-5 border-b border-slate-200 shrink-0">
-    <a href="{% url 'home' %}" class="flex items-center gap-2.5 min-w-0">
+    <a href="{% url 'owner_dashboard' %}" onclick="showSection('dashboard-section'); return false;" class="flex items-center gap-2.5 min-w-0">
       <div class="h-8 w-8 rounded-lg bg-white ring-1 ring-slate-200 flex items-center justify-center shrink-0">
         <img src="{% static 'parkify/images/image.png' %}" alt="Parkify" class="w-5 h-5 object-contain">
       </div>
@@ -70,6 +70,9 @@
       </button>
       <button data-nav-link data-section="booking-section" onclick="showSection('booking-section')" class="sidebar-link w-full">
         <i data-lucide="calendar-check"></i> Bookings
+      </button>
+      <button data-nav-link data-section="analytics-section" onclick="showSection('analytics-section')" class="sidebar-link w-full">
+        <i data-lucide="bar-chart-3"></i> Analytics
       </button>
       <button data-nav-link data-section="notification-section" onclick="showSection('notification-section')" class="sidebar-link w-full">
         <i data-lucide="bell"></i>
@@ -499,6 +502,154 @@
       </div>
     </section>
 
+    <!-- ============ ANALYTICS ============ -->
+    <section id="analytics-section" class="hidden">
+      <div class="mb-5">
+        <h1 class="text-xl font-semibold tracking-tight">Analytics</h1>
+        <p class="mt-0.5 text-sm text-slate-500">Revenue and bookings across your parking lots.</p>
+      </div>
+
+      <!-- Date range -->
+      <div class="rounded-xl border border-slate-200 bg-white p-4 sm:p-5 mb-5">
+        <form method="GET" id="analyticsRangeForm" class="flex flex-wrap items-end gap-3">
+          <input type="hidden" name="section" value="analytics-section">
+          <div>
+            <label class="block text-[11px] font-medium text-slate-500 mb-1">From</label>
+            <input type="date" id="analyticsStartDate" name="start_date" value="{{ start_date }}" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-400 transition">
+          </div>
+          <div>
+            <label class="block text-[11px] font-medium text-slate-500 mb-1">To</label>
+            <input type="date" id="analyticsEndDate" name="end_date" value="{{ end_date }}" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-400 transition">
+          </div>
+          <button type="submit" class="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white px-3.5 py-2 text-sm font-medium transition">
+            <i data-lucide="filter" class="w-3.5 h-3.5"></i> Apply
+          </button>
+          {% if start_date or end_date %}
+          <a href="{% url 'owner_dashboard' %}?section=analytics-section" class="text-sm font-medium text-slate-500 hover:text-slate-700 transition pb-2">Clear</a>
+          {% endif %}
+
+          <div class="w-full flex flex-wrap gap-1.5 pt-1">
+            <button type="button" data-preset="today" class="analytics-preset rounded-full border border-slate-200 px-3 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 transition">Today</button>
+            <button type="button" data-preset="7" class="analytics-preset rounded-full border border-slate-200 px-3 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 transition">Last 7 days</button>
+            <button type="button" data-preset="30" class="analytics-preset rounded-full border border-slate-200 px-3 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 transition">Last 30 days</button>
+            <button type="button" data-preset="month" class="analytics-preset rounded-full border border-slate-200 px-3 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 transition">This month</button>
+          </div>
+        </form>
+      </div>
+
+      {% if start_date or end_date %}
+      <p class="mb-4 text-xs text-slate-500">
+        Showing
+        {% if start_date %}from <span class="font-medium text-slate-700">{{ start_date }}</span>{% endif %}
+        {% if end_date %}to <span class="font-medium text-slate-700">{{ end_date }}</span>{% endif %}
+        — this also filters the totals on your Overview tab.
+      </p>
+      {% endif %}
+
+      <!-- Summary stats with period-over-period deltas -->
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-5">
+        <div class="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
+          <p class="text-xs font-medium text-slate-500">Bookings</p>
+          <div class="mt-2 flex items-center gap-2">
+            <p class="text-2xl font-semibold tracking-tight">{{ total_owner_bookings }}</p>
+            {% if bookings_change_pct != None %}
+            <span class="inline-flex items-center gap-0.5 text-xs font-semibold {% if bookings_change_pct >= 0 %}text-emerald-600{% else %}text-red-600{% endif %}">
+              <i data-lucide="{% if bookings_change_pct >= 0 %}trending-up{% else %}trending-down{% endif %}" class="w-3.5 h-3.5"></i>{{ bookings_change_pct }}%
+            </span>
+            {% endif %}
+          </div>
+          {% if bookings_change_pct != None %}<p class="text-[11px] text-slate-400 mt-0.5">vs previous period</p>{% endif %}
+        </div>
+        <div class="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
+          <p class="text-xs font-medium text-slate-500">Revenue</p>
+          <div class="mt-2 flex items-center gap-2">
+            <p class="text-2xl font-semibold tracking-tight text-emerald-700">Rs {{ total_owner_revenue }}</p>
+            {% if revenue_change_pct != None %}
+            <span class="inline-flex items-center gap-0.5 text-xs font-semibold {% if revenue_change_pct >= 0 %}text-emerald-600{% else %}text-red-600{% endif %}">
+              <i data-lucide="{% if revenue_change_pct >= 0 %}trending-up{% else %}trending-down{% endif %}" class="w-3.5 h-3.5"></i>{{ revenue_change_pct }}%
+            </span>
+            {% endif %}
+          </div>
+          {% if revenue_change_pct != None %}<p class="text-[11px] text-slate-400 mt-0.5">vs previous period</p>{% endif %}
+        </div>
+        <div class="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
+          <p class="text-xs font-medium text-slate-500">Avg. Booking Value</p>
+          <p class="mt-2 text-2xl font-semibold tracking-tight">Rs {{ avg_booking_value }}</p>
+        </div>
+        <div class="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
+          <p class="text-xs font-medium text-slate-500">Occupancy today</p>
+          <p class="mt-2 text-2xl font-semibold tracking-tight">{{ occupancy }}%</p>
+        </div>
+      </div>
+
+      <div class="grid lg:grid-cols-3 gap-4 sm:gap-5">
+        <!-- Revenue per lot -->
+        <div class="lg:col-span-2 rounded-xl border border-slate-200 bg-white overflow-hidden">
+          <div class="px-5 py-4 border-b border-slate-200">
+            <h2 class="text-sm font-semibold">Revenue by Parking Lot</h2>
+          </div>
+          <div class="divide-y divide-slate-100">
+            {% for row in revenue_per_lot %}
+            <div class="px-5 py-4">
+              <div class="flex items-center justify-between gap-3 mb-2">
+                <div class="flex items-center gap-2 min-w-0">
+                  <span class="shrink-0 h-5 w-5 rounded-full bg-slate-100 text-slate-500 text-[11px] font-semibold flex items-center justify-center">{{ forloop.counter }}</span>
+                  <p class="text-sm font-medium truncate">{{ row.parking.parking_name }}</p>
+                </div>
+                <div class="flex items-center gap-3 shrink-0 text-sm">
+                  <span class="text-slate-400 text-xs">{{ row.share }}%</span>
+                  <span class="text-slate-500">{{ row.bookings }} booking{{ row.bookings|pluralize }}</span>
+                  <span class="font-semibold text-emerald-700">Rs {{ row.revenue }}</span>
+                </div>
+              </div>
+              <div class="h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                <div class="h-full bg-emerald-500 rounded-full" style="width: {% if max_lot_revenue %}{% widthratio row.revenue max_lot_revenue 100 %}{% else %}0{% endif %}%"></div>
+              </div>
+            </div>
+            {% empty %}
+            <p class="text-slate-400 text-sm px-5 py-10 text-center">No parking lots to show yet.</p>
+            {% endfor %}
+          </div>
+        </div>
+
+        <!-- Booking status breakdown -->
+        <div class="rounded-xl border border-slate-200 bg-white overflow-hidden">
+          <div class="px-5 py-4 border-b border-slate-200">
+            <h2 class="text-sm font-semibold">Bookings by Status</h2>
+          </div>
+          <div class="p-5 space-y-3">
+            <div class="flex items-center justify-between text-sm">
+              <span class="flex items-center gap-2"><span class="h-2 w-2 rounded-full bg-amber-500"></span>Pending</span>
+              <span class="font-semibold">{{ status_breakdown.Pending }}</span>
+            </div>
+            <div class="flex items-center justify-between text-sm">
+              <span class="flex items-center gap-2"><span class="h-2 w-2 rounded-full bg-blue-500"></span>Active</span>
+              <span class="font-semibold">{{ status_breakdown.Active }}</span>
+            </div>
+            <div class="flex items-center justify-between text-sm">
+              <span class="flex items-center gap-2"><span class="h-2 w-2 rounded-full bg-emerald-500"></span>Completed</span>
+              <span class="font-semibold">{{ status_breakdown.Completed }}</span>
+            </div>
+            <div class="flex items-center justify-between text-sm">
+              <span class="flex items-center gap-2"><span class="h-2 w-2 rounded-full bg-red-500"></span>Cancelled</span>
+              <span class="font-semibold">{{ status_breakdown.Cancelled }}</span>
+            </div>
+
+            {% if total_owner_bookings %}
+            <div class="h-2 rounded-full bg-slate-100 overflow-hidden flex mt-2">
+              <div class="h-full bg-amber-500" style="width: {% widthratio status_breakdown.Pending total_owner_bookings 100 %}%"></div>
+              <div class="h-full bg-blue-500" style="width: {% widthratio status_breakdown.Active total_owner_bookings 100 %}%"></div>
+              <div class="h-full bg-emerald-500" style="width: {% widthratio status_breakdown.Completed total_owner_bookings 100 %}%"></div>
+              <div class="h-full bg-red-500" style="width: {% widthratio status_breakdown.Cancelled total_owner_bookings 100 %}%"></div>
+            </div>
+            {% else %}
+            <p class="text-slate-400 text-xs pt-1">No bookings in this range yet.</p>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- ============ NOTIFICATIONS ============ -->
     <section id="notification-section" class="hidden">
       <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
@@ -678,6 +829,7 @@ const sectionTitles = {
   'add-parking-section': 'Add Parking Lot',
   'parking-section': 'Parking Lots',
   'booking-section': 'Bookings',
+  'analytics-section': 'Analytics',
   'notification-section': 'Notifications',
   'setting-section': 'Settings',
   'change-password-section': 'Change Password',
@@ -687,7 +839,7 @@ const sectionTitles = {
 function showSection(section) {
   const sections = [
     'dashboard-section', 'add-parking-section', 'parking-section',
-    'booking-section', 'notification-section', 'setting-section',
+    'booking-section', 'analytics-section', 'notification-section', 'setting-section',
     'change-password-section', 'two-factor-section'
   ];
   sections.forEach(id => {
@@ -720,6 +872,37 @@ function toggleSidebar(open) {
   backdrop.classList.toggle('opacity-0', !open);
   backdrop.classList.toggle('pointer-events-none', !open);
 }
+
+function toDateInputValue(d) {
+  return d.toISOString().slice(0, 10);
+}
+
+document.querySelectorAll('.analytics-preset').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const preset = btn.getAttribute('data-preset');
+    const today = new Date();
+    let start = new Date();
+    let end = new Date();
+
+    if (preset === 'today') {
+      start = today;
+      end = today;
+    } else if (preset === '7') {
+      start.setDate(today.getDate() - 6);
+      end = today;
+    } else if (preset === '30') {
+      start.setDate(today.getDate() - 29);
+      end = today;
+    } else if (preset === 'month') {
+      start = new Date(today.getFullYear(), today.getMonth(), 1);
+      end = today;
+    }
+
+    document.getElementById('analyticsStartDate').value = toDateInputValue(start);
+    document.getElementById('analyticsEndDate').value = toDateInputValue(end);
+    document.getElementById('analyticsRangeForm').submit();
+  });
+});
 
 const ownerMapContainer = document.getElementById('ownerMap');
 if (ownerMapContainer) {
@@ -770,6 +953,13 @@ if (clearNotificationsBtn) {
       }
     });
   });
+}
+
+const paramsSection = new URLSearchParams(window.location.search).get('section');
+if (paramsSection && sectionTitles[paramsSection]) {
+  showSection(paramsSection);
+} else if ({% if start_date or end_date %}true{% else %}false{% endif %}) {
+  showSection('analytics-section');
 }
 </script>
 </body>

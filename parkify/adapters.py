@@ -65,11 +65,17 @@ class ParkifySocialAccountAdapter(DefaultSocialAccountAdapter):
 
         next_url = self._safe_next(request, sociallogin)
 
+        # Set by google_signup_start() when the person clicked "Sign up as
+        # Owner via Google" - only ever consumed here, and only applied to a
+        # brand-new account. Popped unconditionally so a stale value can
+        # never leak into a later, unrelated plain Google sign-in.
+        pending_role = request.session.pop("pending_google_signup_role", "user")
+
         user = Signup.objects.filter(email__iexact=email).first()
         is_new_account = user is None
 
         if is_new_account:
-            user = self._create_signup_from_google(email, extra_data)
+            user = self._create_signup_from_google(email, extra_data, pending_role)
 
         # ---- Same account-state checks as the normal login view ----
 
@@ -120,12 +126,16 @@ class ParkifySocialAccountAdapter(DefaultSocialAccountAdapter):
             return next_url
         return None
 
-    def _create_signup_from_google(self, email, extra_data):
+    def _create_signup_from_google(self, email, extra_data, role="user"):
         """First-time Google sign-in for this email - create a Signup row.
 
-        New Google accounts default to role='user'. Parking owners still
-        go through the normal owner sign-up + document verification flow;
-        they can switch to Google login later once their email matches.
+        `role` comes from google_signup_start() (via session, see
+        pre_social_login above) if the person chose "Sign up as Owner via
+        Google" - otherwise it defaults to 'user', matching a plain
+        "Continue with Google" click. Either way this mirrors the normal
+        signup view exactly: just sets Signup.role, no OwnerProfile is
+        created here - owners still complete that via the existing
+        "Complete your profile" step after their first login.
         """
         first_name = extra_data.get("given_name") or (extra_data.get("name", "").split(" ")[0] if extra_data.get("name") else "Parkify")
         last_name = extra_data.get("family_name") or ""
@@ -138,7 +148,7 @@ class ParkifySocialAccountAdapter(DefaultSocialAccountAdapter):
             # Random unusable password - this account only ever signs in
             # via Google unless the person later uses "Forgot password".
             password=make_password(get_random_string(32)),
-            role="user",
+            role=role,
         )
 
         self._attach_google_picture(user, extra_data.get("picture"))
